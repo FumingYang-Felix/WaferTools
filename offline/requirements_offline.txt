@@ -1,0 +1,29 @@
+# Pin versions; build wheels on a compatible online machine.
+# Install offline with:
+#   pip install --no-index --find-links=offline/wheels -r offline/requirements_offline.txt
+
+numpy==1.26.4
+pandas==2.2.2
+scipy==1.12.0
+matplotlib==3.8.4
+Pillow==10.3.0
+seaborn==0.13.2
+requests==2.32.3
+
+dash==2.17.1
+dash-bootstrap-components==1.6.0
+plotly==5.22.0
+
+opencv-python==4.9.0.80
+scikit-image==0.23.2
+tifffile==2024.7.24
+
+scikit-learn==1.4.2
+ultralytics==8.2.40
+
+torch==2.2.2
+
+PyQt5==5.15.10
+
+# Segment Anything: place a prebuilt wheel in offline/wheels and set the exact name here if needed
+segment-anything==1.0
