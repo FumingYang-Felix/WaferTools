@@ -1,0 +1,186 @@
+/* Main container styles */
+.custom-container {
+    padding: 20px;
+    background-color: #f8f9fa;
+    min-height: 100vh;
+}
+
+/* Sidebar styles */
+.sidebar {
+    background-color: #343a40;
+    padding: 20px;
+    height: 100vh;
+    position: relative;
+    width: 250px;
+    min-height: 100vh;
+}
+
+/* Main content area */
+.main-content {
+    margin-left: 250px;
+    width: calc(100vw - 250px);
+    min-height: 100vh;
+    background: #f8f9fa;
+    display: flex;
+    flex-direction: column;
+    padding: 30px 30px 30px 30px;
+}
+
+/* Navigation links */
+.nav-link {
+    color: #fff;
+    margin: 10px 0;
+    padding: 10px;
+    border-radius: 5px;
+    transition: all 0.3s;
+}
+
+.nav-link:hover {
+    background-color: #495057;
+    color: #fff;
+    text-decoration: none;
+}
+
+.nav-link.active {
+    background-color: #007bff;
+    color: #fff;
+}
+
+/* Upload buttons */
+.upload-button {
+    width: 100%;
+    margin: 10px 0;
+    padding: 10px;
+    border-radius: 5px;
+}
+
+/* Graph containers */
+.graph-container {
+    background-color: #fff;
+    padding: 10px 10px 10px 10px;
+    border-radius: 10px;
+    box-shadow: 0 0 10px rgba(0,0,0,0.08);
+    margin-bottom: 10px;
+    min-height: 200px;
+}
+
+/* Status text */
+.status-text {
+    font-size: 0.9em;
+    margin-top: 5px;
+}
+
+/* Progress bars */
+.progress {
+    height: 20px;
+    margin-top: 10px;
+}
+
+/* Overlay options */
+.overlay-options {
+    margin: 15px 0;
+    padding: 10px;
+    background-color: #f8f9fa;
+    border-radius: 5px;
+}
+
+/* Placeholder page */
+.placeholder-container {
+    text-align: center;
+    padding: 40px;
+}
+
+.placeholder-icon {
+    font-size: 3em;
+    color: #6c757d;
+    margin-bottom: 20px;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .sidebar {
+        width: 100%;
+        height: auto;
+        position: relative;
+    }
+    
+    .main-content {
+        margin-left: 0;
+    }
+}
+
+/* Sidebar标题更突出 */
+.sidebar h2, .sidebar-title {
+    font-size: 2.4em;
+    font-weight: 800;
+    margin-bottom: 30px;
+    letter-spacing: 1px;
+    border-bottom: 2px solid #495057;
+    padding-bottom: 10px;
+}
+
+/* 导航和标题区分 */
+.sidebar-nav {
+    margin-top: 30px;
+}
+
+/* 让dcc.Graph自适应高度 */
+.graph-container .js-plotly-plot {
+    height: 100% !important;
+    min-height: 300px;
+}
+
+/* 让area-histogram的figure高度更大 */
+#area-histogram {
+    min-height: 320px;
+}
+
+/* 让直方图的文字不被遮挡 */
+#area-histogram .gtitle, #area-histogram .xtick, #area-histogram .ytick {
+    font-size: 1em !important;
+}
+
+/* 让dcc.Graph的注释字体更小，内容居中 */
+.js-plotly-plot .annotation {
+    font-size: 1em !important;
+    text-align: center !important;
+    white-space: pre-line !important;
+    width: 100% !important;
+}
+
+/*
+.container, .container-fluid {
+    max-width: 100vw !important;
+    width: 100vw !important;
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+}
+*/
+.row {
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+} 
+
+/* ====== tif-stack-slider 放大样式 ====== */
+.tif-stack-slider .rc-slider {
+    height: 36px !important;
+    margin: 0 auto 24px auto !important;
+    width: 60% !important;
+    display: block !important;
+}
+.tif-stack-slider .rc-slider-handle {
+    width: 32px !important;
+    height: 32px !important;
+    margin-top: -14px !important;
+    background: #007bff !important;
+    border: 3px solid #fff !important;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.15) !important;
+}
+.tif-stack-slider .rc-slider-rail {
+    height: 12px !important;
+    background: #e0e0e0 !important;
+}
+.tif-stack-slider .rc-slider-track {
+    height: 12px !important;
+    background: #007bff !important;
+} 
