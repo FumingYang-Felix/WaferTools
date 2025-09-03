@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """
-generate_candidate_orders.py - 生成正向和反向两个候选顺序
+generate_candidate_orders.py - generate two candidate orders, forward and reverse
 """
 
 def generate_candidate_orders():
-    """生成候选顺序"""
+    """generate candidate orders"""
     
-    # 从分析结果中提取的路径
+    # extract paths from analysis results
     forward_path = [
         "section_14_r01_c01", "section_42_r01_c01", "section_41_r01_c01", "section_78_r01_c01",
         "section_21_r01_c01", "section_47_r01_c01", "section_96_r01_c01", "section_84_r01_c01",
@@ -31,67 +31,67 @@ def generate_candidate_orders():
         "section_106_r01_c01"
     ]
     
-    # 生成反向路径
+    # generate reverse path
     reverse_path = forward_path[::-1]
     
-    # 保存正向顺序
+    # save forward order
     with open('candidate_order_forward.txt', 'w') as f:
         for section in forward_path:
             f.write(section + '\n')
     
-    # 保存反向顺序
+    # save reverse order
     with open('candidate_order_reverse.txt', 'w') as f:
         for section in reverse_path:
             f.write(section + '\n')
     
-    # 保存完整信息
+    # save complete information
     with open('candidate_orders_complete.txt', 'w') as f:
-        f.write("候选顺序生成结果\n")
+        f.write("candidate orders generation results\n")
         f.write("=" * 50 + "\n\n")
-        f.write("说明: 由于best pair只提供连接信息，不提供方向信息，\n")
-        f.write("我们生成了两个候选顺序，需要根据其他信息确定正确方向。\n\n")
+        f.write("note: since best pair only provides connection information, not direction information,\n")
+        f.write("we generated two candidate orders, and need to determine the correct direction based on other information.\n\n")
         
-        f.write("候选顺序1 (正向):\n")
+        f.write("candidate order 1 (forward):\n")
         f.write("-" * 30 + "\n")
         for i, section in enumerate(forward_path, 1):
             f.write(f"{i:3d}. {section}\n")
         
-        f.write(f"\n候选顺序2 (反向):\n")
+        f.write(f"\ncandidate order 2 (reverse):\n")
         f.write("-" * 30 + "\n")
         for i, section in enumerate(reverse_path, 1):
             f.write(f"{i:3d}. {section}\n")
         
-        f.write(f"\n统计信息:\n")
-        f.write(f"  路径长度: {len(forward_path)} sections\n")
-        f.write(f"  覆盖sections: {len(forward_path)}/100\n")
-        f.write(f"  缺失sections: {100 - len(forward_path)} 个\n")
+        f.write(f"\nstatistics:\n")
+        f.write(f"  path length: {len(forward_path)} sections\n")
+        f.write(f"  covered sections: {len(forward_path)}/100\n")
+        f.write(f"  missing sections: {100 - len(forward_path)} sections\n")
         
-        # 找出缺失的sections
+        # find missing sections
         all_sections = set()
         for i in range(1, 107):
             all_sections.add(f"section_{i}_r01_c01")
         
         missing_sections = all_sections - set(forward_path)
         if missing_sections:
-            f.write(f"  缺失的sections: {', '.join(sorted(missing_sections))}\n")
+            f.write(f"  missing sections: {', '.join(sorted(missing_sections))}\n")
     
-    print("候选顺序已生成:")
-    print("  - candidate_order_forward.txt (正向)")
-    print("  - candidate_order_reverse.txt (反向)")
-    print("  - candidate_orders_complete.txt (完整信息)")
-    print(f"\n路径长度: {len(forward_path)} sections")
-    print(f"覆盖率: {len(forward_path)}/100 = {len(forward_path)/100*100:.1f}%")
+    print("candidate orders generated:")
+    print("  - candidate_order_forward.txt (forward)")
+    print("  - candidate_order_reverse.txt (reverse)")
+    print("  - candidate_orders_complete.txt (complete information)")
+    print(f"\npath length: {len(forward_path)} sections")
+    print(f"coverage: {len(forward_path)}/100 = {len(forward_path)/100*100:.1f}%")
 
 if __name__ == "__main__":
     generate_candidate_orders() 
 """
-generate_candidate_orders.py - 生成正向和反向两个候选顺序
+generate_candidate_orders.py - generate two candidate orders, forward and reverse
 """
 
 def generate_candidate_orders():
-    """生成候选顺序"""
+    """generate candidate orders"""
     
-    # 从分析结果中提取的路径
+    # extract paths from analysis results
     forward_path = [
         "section_14_r01_c01", "section_42_r01_c01", "section_41_r01_c01", "section_78_r01_c01",
         "section_21_r01_c01", "section_47_r01_c01", "section_96_r01_c01", "section_84_r01_c01",
@@ -116,56 +116,56 @@ def generate_candidate_orders():
         "section_106_r01_c01"
     ]
     
-    # 生成反向路径
+    # generate reverse path
     reverse_path = forward_path[::-1]
     
-    # 保存正向顺序
+    # save forward order
     with open('candidate_order_forward.txt', 'w') as f:
         for section in forward_path:
             f.write(section + '\n')
     
-    # 保存反向顺序
+    # save reverse order
     with open('candidate_order_reverse.txt', 'w') as f:
         for section in reverse_path:
             f.write(section + '\n')
     
-    # 保存完整信息
+    # save complete information
     with open('candidate_orders_complete.txt', 'w') as f:
-        f.write("候选顺序生成结果\n")
+        f.write("candidate orders generation results\n")
         f.write("=" * 50 + "\n\n")
-        f.write("说明: 由于best pair只提供连接信息，不提供方向信息，\n")
-        f.write("我们生成了两个候选顺序，需要根据其他信息确定正确方向。\n\n")
+        f.write("note: since best pair only provides connection information, not direction information,\n")
+        f.write("we generated two candidate orders, and need to determine the correct direction based on other information.\n\n")
         
-        f.write("候选顺序1 (正向):\n")
+        f.write("candidate order 1 (forward):\n")
         f.write("-" * 30 + "\n")
         for i, section in enumerate(forward_path, 1):
             f.write(f"{i:3d}. {section}\n")
         
-        f.write(f"\n候选顺序2 (反向):\n")
+        f.write(f"\ncandidate order 2 (reverse):\n")
         f.write("-" * 30 + "\n")
         for i, section in enumerate(reverse_path, 1):
             f.write(f"{i:3d}. {section}\n")
         
-        f.write(f"\n统计信息:\n")
-        f.write(f"  路径长度: {len(forward_path)} sections\n")
-        f.write(f"  覆盖sections: {len(forward_path)}/100\n")
-        f.write(f"  缺失sections: {100 - len(forward_path)} 个\n")
+        f.write(f"\nstatistics:\n")
+        f.write(f"  path length: {len(forward_path)} sections\n")
+        f.write(f"  covered sections: {len(forward_path)}/100\n")
+        f.write(f"  missing sections: {100 - len(forward_path)} sections\n")
         
-        # 找出缺失的sections
+        # find missing sections
         all_sections = set()
         for i in range(1, 107):
             all_sections.add(f"section_{i}_r01_c01")
         
         missing_sections = all_sections - set(forward_path)
         if missing_sections:
-            f.write(f"  缺失的sections: {', '.join(sorted(missing_sections))}\n")
+            f.write(f"  missing sections: {', '.join(sorted(missing_sections))}\n")
     
-    print("候选顺序已生成:")
-    print("  - candidate_order_forward.txt (正向)")
-    print("  - candidate_order_reverse.txt (反向)")
-    print("  - candidate_orders_complete.txt (完整信息)")
-    print(f"\n路径长度: {len(forward_path)} sections")
-    print(f"覆盖率: {len(forward_path)}/100 = {len(forward_path)/100*100:.1f}%")
+    print("candidate orders generated:")
+    print("  - candidate_order_forward.txt (forward)")
+    print("  - candidate_order_reverse.txt (reverse)")
+    print("  - candidate_orders_complete.txt (complete information)")
+    print(f"\npath length: {len(forward_path)} sections")
+    print(f"coverage: {len(forward_path)}/100 = {len(forward_path)/100*100:.1f}%")
 
 if __name__ == "__main__":
     generate_candidate_orders() 
