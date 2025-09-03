@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """
-find_second_best_pairs.py - 为未覆盖的sections找到第二好的pair
+find_second_best_pairs.py - find second best pairs for uncovered sections
 """
 
 def load_rigid_chains():
-    """加载40个刚性链"""
+    """load 40 rigid chains"""
     chains = [
         ['section_1_r01_c01', 'section_13_r01_c01'],
         ['section_39_r01_c01', 'section_15_r01_c01', 'section_52_r01_c01', 'section_3_r01_c01'],
@@ -50,21 +50,21 @@ def load_rigid_chains():
     return chains
 
 def get_chain_head_tail(chains):
-    """获取每个链的头尾节点"""
+    """get head and tail of each chain"""
     head_tail = {}
     for i, chain in enumerate(chains):
         head_tail[i+1] = (chain[0], chain[-1])
     return head_tail
 
 def is_chain_head_tail(section, head_tail):
-    """检查section是否是某个链的头或尾"""
+    """check if section is the head or tail of some chain"""
     for chain_id, (head, tail) in head_tail.items():
         if section == head or section == tail:
             return True, chain_id
     return False, None
 
 def load_top_two_pairs():
-    """加载top_two_pairs_for_each_section.txt的数据"""
+    """load data from top_two_pairs_for_each_section.txt"""
     pairs_data = {}
     
     with open('top_two_pairs_for_each_section.txt', 'r') as f:
@@ -78,11 +78,11 @@ def load_top_two_pairs():
                 pair1_part = parts[1].strip()
                 pair2_part = parts[2].strip()
                 
-                # 解析第一个pair
+                # parse first pair
                 pair1_match = pair1_part.split('(')[0].strip()
                 score1 = float(pair1_part.split('score:')[1].split(')')[0].strip())
                 
-                # 解析第二个pair
+                # parse second pair
                 pair2_match = pair2_part.split('(')[0].strip()
                 score2 = float(pair2_part.split('score:')[1].split(')')[0].strip())
                 
@@ -94,8 +94,8 @@ def load_top_two_pairs():
     return pairs_data
 
 def find_second_best_pairs_for_uncovered():
-    """为未覆盖的sections找到第二好的pair"""
-    # 未覆盖的sections
+    """find second best pairs for uncovered sections"""
+    # uncovered sections
     uncovered_sections = [
         'section_106_r01_c01',
         'section_20_r01_c01', 
@@ -114,7 +114,7 @@ def find_second_best_pairs_for_uncovered():
     head_tail = get_chain_head_tail(chains)
     pairs_data = load_top_two_pairs()
     
-    print("为未覆盖的sections寻找第二好的pair")
+    print("find second best pairs for uncovered sections")
     print("=" * 60)
     
     results = []
@@ -125,14 +125,14 @@ def find_second_best_pairs_for_uncovered():
             pair2, score2 = pairs_data[section]['pair2']
             
             print(f"\n{section}:")
-            print(f"  第一好pair: {pair1} (score: {score1})")
-            print(f"  第二好pair: {pair2} (score: {score2})")
+            print(f"  first best pair: {pair1} (score: {score1})")
+            print(f"  second best pair: {pair2} (score: {score2})")
             
-            # 检查第二好pair是否连接到链的头尾
+            # check if second best pair is connected to the head or tail of some chain
             is_head_tail, chain_id = is_chain_head_tail(pair2, head_tail)
             
             if is_head_tail:
-                print(f"  ✓ 第二好pair连接到链{chain_id}的头尾")
+                print(f"  ✓ second best pair is connected to the head or tail of chain {chain_id}")
                 results.append({
                     'section': section,
                     'pair': pair2,
@@ -141,7 +141,7 @@ def find_second_best_pairs_for_uncovered():
                     'valid': True
                 })
             else:
-                print(f"  ✗ 第二好pair不连接到任何链的头尾")
+                print(f"  ✗ second best pair is not connected to any chain's head or tail")
                 results.append({
                     'section': section,
                     'pair': pair2,
@@ -150,7 +150,7 @@ def find_second_best_pairs_for_uncovered():
                     'valid': False
                 })
         else:
-            print(f"\n{section}: 没有找到配对数据")
+            print(f"\n{section}: no pair data found")
             results.append({
                 'section': section,
                 'pair': None,
@@ -159,59 +159,59 @@ def find_second_best_pairs_for_uncovered():
                 'valid': False
             })
     
-    # 统计结果
+    # statistics
     valid_pairs = [r for r in results if r['valid']]
     invalid_pairs = [r for r in results if not r['valid']]
     
-    print(f"\n统计结果:")
-    print(f"有效的第二好pair: {len(valid_pairs)}")
-    print(f"无效的第二好pair: {len(invalid_pairs)}")
+    print(f"\nstatistics:")
+    print(f"valid second best pairs: {len(valid_pairs)}")
+    print(f"invalid second best pairs: {len(invalid_pairs)}")
     
     if valid_pairs:
-        print(f"\n有效的连接:")
+        print(f"\nvalid connections:")
         for result in valid_pairs:
-            print(f"  {result['section']} -> {result['pair']} (score: {result['score']}) -> 链{result['chain_id']}")
+            print(f"  {result['section']} -> {result['pair']} (score: {result['score']}) -> chain {result['chain_id']}")
     
     if invalid_pairs:
-        print(f"\n无效的连接:")
+        print(f"\ninvalid connections:")
         for result in invalid_pairs:
             if result['pair']:
-                print(f"  {result['section']} -> {result['pair']} (score: {result['score']})")
+                print(f"  {result['section']} -> {result['pair']} (score: {result['score']})") 
             else:
-                print(f"  {result['section']} -> 无配对数据")
+                print(f"  {result['section']} -> no pair data")
     
     return results
 
 def main():
-    """主函数"""
+    """main function"""
     results = find_second_best_pairs_for_uncovered()
     
-    # 保存结果到文件
+    # save results to file
     with open('second_best_pairs_analysis.txt', 'w') as f:
-        f.write("未覆盖sections的第二好pair分析\n")
+        f.write("second best pairs analysis for uncovered sections\n")
         f.write("=" * 60 + "\n\n")
         
         valid_pairs = [r for r in results if r['valid']]
         invalid_pairs = [r for r in results if not r['valid']]
         
-        f.write(f"有效的第二好pair: {len(valid_pairs)}\n")
-        f.write(f"无效的第二好pair: {len(invalid_pairs)}\n\n")
+        f.write(f"valid second best pairs: {len(valid_pairs)}\n")
+        f.write(f"invalid second best pairs: {len(invalid_pairs)}\n\n")
         
         if valid_pairs:
-            f.write("有效的连接:\n")
+            f.write("valid connections:\n")
             for result in valid_pairs:
-                f.write(f"  {result['section']} -> {result['pair']} (score: {result['score']}) -> 链{result['chain_id']}\n")
+                f.write(f"  {result['section']} -> {result['pair']} (score: {result['score']}) -> chain {result['chain_id']}\n")
             f.write("\n")
         
         if invalid_pairs:
-            f.write("无效的连接:\n")
+            f.write("invalid connections:\n")
             for result in invalid_pairs:
                 if result['pair']:
                     f.write(f"  {result['section']} -> {result['pair']} (score: {result['score']})\n")
                 else:
-                    f.write(f"  {result['section']} -> 无配对数据\n")
+                    f.write(f"  {result['section']} -> no pair data\n")
     
-    print(f"\n结果已保存到 second_best_pairs_analysis.txt")
+    print(f"\nresults saved to second_best_pairs_analysis.txt")
 
 if __name__ == "__main__":
     main() 
