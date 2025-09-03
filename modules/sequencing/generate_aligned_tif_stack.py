@@ -20,7 +20,7 @@ def parse_chain_file(chain_file_path):
     return None
 
 def texture_rich_color_invariant_preprocessing(img):
-    # 可根据你的主流程替换
+    # can be replaced with your main process
     if img.shape[2] == 3:
         img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
     return img
@@ -46,7 +46,7 @@ def generate_aligned_tif_stack(folder, chain_file, resize=0.25, output_path='ali
             return
     aligned_imgs = []
     h0, w0 = imgs[0].shape[:2]
-    # 第一张累计仿射为单位阵
+    # the first image is accumulated affine to the identity matrix
     M_total = np.eye(3)
     aligned_imgs.append(imgs[0])
     for i in range(1, len(imgs)):
@@ -83,14 +83,14 @@ def generate_aligned_tif_stack(folder, chain_file, resize=0.25, output_path='ali
             print(f'Alignment failed at index {i}')
             aligned_imgs.append(img2)
             continue
-        # 累计仿射到全局
+        # accumulate affine to global
         M3 = np.eye(3)
         M3[:2, :] = M
         M_total = M3 @ M_total
         M_total_2x3 = M_total[:2, :]
         aligned_img2 = cv2.warpAffine(imgs[i], M_total_2x3, (w0, h0))
         aligned_imgs.append(aligned_img2)
-    # 保存为tif stack
+    # save as tif stack
     tifffile.imwrite(output_path, np.stack(aligned_imgs), photometric='rgb')
     print(f'Aligned tif stack saved to {output_path}')
 
