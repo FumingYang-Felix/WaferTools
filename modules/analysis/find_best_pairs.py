@@ -1,47 +1,47 @@
 #!/usr/bin/env python3
 """
-find_best_pairs.py - 找出每个section的最佳配对（最高score）
+find_best_pairs.py - find best pairs for each section
 """
 
 import pandas as pd
 import numpy as np
 
 def load_csv(csv_file):
-    """加载CSV文件"""
+    """load CSV file"""
     df = pd.read_csv(csv_file)
-    print(f"加载CSV文件: {csv_file}")
-    print(f"总行数: {len(df)}")
+    print(f"load CSV file: {csv_file}")
+    print(f"total rows: {len(df)}")
     return df
 
 def get_all_sections(df):
-    """获取所有唯一的sections，按数字顺序排序"""
+    """get all unique sections, sorted by number"""
     all_sections = set(df['fixed'].unique()) | set(df['moving'].unique())
     
-    # 按section数字排序
+    # sort by section number
     def extract_number(section_name):
         try:
-            # 提取section_后面的数字
+            # extract number after section_
             return int(section_name.split('_')[1])
         except:
-            return 999  # 如果无法解析，放在最后
+            return 999  # if cannot parse, put at the end
     
     sorted_sections = sorted(all_sections, key=extract_number)
-    print(f"总共有 {len(sorted_sections)} 个唯一sections")
+    print(f"total unique sections: {len(sorted_sections)}")
     return sorted_sections
 
 def find_top_two_pairs_for_section(section, df):
-    """找出指定section的前两个最佳配对"""
-    # 查找包含该section的所有行
+    """find top two best pairs for specified section"""
+    # find all rows containing the specified section
     mask_fixed = df['fixed'] == section
     mask_moving = df['moving'] == section
     
-    # 合并所有相关行
+    # merge all relevant rows
     relevant_rows = df[mask_fixed | mask_moving].copy()
     
     if len(relevant_rows) == 0:
         return []
     
-    # 收集所有配对和分数
+    # collect all pairs and scores
     pairs = []
     for _, row in relevant_rows.iterrows():
         if row['fixed'] == section:
@@ -59,21 +59,21 @@ def find_top_two_pairs_for_section(section, df):
             'direction': direction
         })
     
-    # 按分数排序，取前两个
+    # sort by score, take top two
     pairs.sort(key=lambda x: x['score'], reverse=True)
     return pairs[:2]
 
 def main():
-    # 加载数据
+    # load data
     df = load_csv('new_pairwise_filtered.csv')
     
-    # 获取所有sections
+    # get all sections
     all_sections = get_all_sections(df)
     
-    # 找出每个section的前两个最佳配对
+    # find top two best pairs for each section
     results = []
     
-    print(f"\n开始分析每个section的前两个最佳配对...")
+    print(f"\nstart analyzing top two best pairs for each section...")
     
     for section in all_sections:
         top_pairs = find_top_two_pairs_for_section(section, df)
@@ -88,17 +88,17 @@ def main():
             for i, pair in enumerate(top_pairs, 1):
                 print(f"  {i}. -> {pair['other_section']:20s} (score: {pair['score']:.4f}) [{pair['direction']}]")
         else:
-            print(f"{section:20s}: 无配对")
+            print(f"{section:20s}: no pairs")
     
-    # 保存结果到文件
+    # save results to file
     output_file = 'top_two_pairs_for_each_section.txt'
     with open(output_file, 'w') as f:
-        f.write("Section前两个最佳配对分析结果\n")
+        f.write("Top two best pairs for each section\n")
         f.write("=" * 60 + "\n\n")
-        f.write(f"总sections数: {len(all_sections)}\n")
-        f.write(f"分析时间: {pd.Timestamp.now()}\n\n")
+        f.write(f"total sections: {len(all_sections)}\n")
+        f.write(f"analysis time: {pd.Timestamp.now()}\n\n")
         
-        f.write("格式: Section -> 配对1 (分数) [方向] -> 配对2 (分数) [方向]\n")
+        f.write("format: Section -> pair1 (score) [direction] -> pair2 (score) [direction]\n")
         f.write("-" * 60 + "\n")
         
         for result in results:
@@ -112,9 +112,9 @@ def main():
             else:
                 f.write(f"{section:20s} -> N/A -> N/A\n")
         
-        # 添加统计信息
+        # add statistics
         f.write("\n" + "=" * 60 + "\n")
-        f.write("统计信息:\n")
+        f.write("statistics:\n")
         
         all_scores = []
         for result in results:
@@ -122,77 +122,77 @@ def main():
                 all_scores.append(pair['score'])
         
         if all_scores:
-            f.write(f"平均分数: {np.mean(all_scores):.4f}\n")
-            f.write(f"最高分数: {np.max(all_scores):.4f}\n")
-            f.write(f"最低分数: {np.min(all_scores):.4f}\n")
-            f.write(f"分数标准差: {np.std(all_scores):.4f}\n")
+            f.write(f"average score: {np.mean(all_scores):.4f}\n")
+            f.write(f"highest score: {np.max(all_scores):.4f}\n")
+            f.write(f"lowest score: {np.min(all_scores):.4f}\n")
+            f.write(f"score standard deviation: {np.std(all_scores):.4f}\n")
         
         sections_with_pairs = sum(1 for r in results if len(r['pairs']) > 0)
-        f.write(f"有配对的sections: {sections_with_pairs}/{len(all_sections)}\n")
+        f.write(f"sections with pairs: {sections_with_pairs}/{len(all_sections)}\n")
     
-    print(f"\n结果已保存到: {output_file}")
+    print(f"\nresults saved to: {output_file}")
     
-    # 显示一些统计信息
+    # show some statistics
     all_scores = []
     for result in results:
         for pair in result['pairs']:
             all_scores.append(pair['score'])
     
     if all_scores:
-        print(f"\n统计信息:")
-        print(f"平均分数: {np.mean(all_scores):.4f}")
-        print(f"最高分数: {np.max(all_scores):.4f}")
-        print(f"最低分数: {np.min(all_scores):.4f}")
-        print(f"分数标准差: {np.std(all_scores):.4f}")
+        print(f"\nstatistics:")
+        print(f"average score: {np.mean(all_scores):.4f}")
+        print(f"highest score: {np.max(all_scores):.4f}")
+        print(f"lowest score: {np.min(all_scores):.4f}")
+        print(f"score standard deviation: {np.std(all_scores):.4f}")
     
     sections_with_pairs = sum(1 for r in results if len(r['pairs']) > 0)
-    print(f"有配对的sections: {sections_with_pairs}/{len(all_sections)}")
+    print(f"sections with pairs: {sections_with_pairs}/{len(all_sections)}")
 
 if __name__ == "__main__":
     main() 
 """
-find_best_pairs.py - 找出每个section的最佳配对（最高score）
+find_best_pairs.py - find best pairs for each section
 """
 
 import pandas as pd
 import numpy as np
 
 def load_csv(csv_file):
-    """加载CSV文件"""
+    """load CSV file"""
     df = pd.read_csv(csv_file)
-    print(f"加载CSV文件: {csv_file}")
-    print(f"总行数: {len(df)}")
+    print(f"load CSV file: {csv_file}")
+    print(f"total rows: {len(df)}")
     return df
 
 def get_all_sections(df):
-    """获取所有唯一的sections，按数字顺序排序"""
+    """get all unique sections, sorted by number"""
     all_sections = set(df['fixed'].unique()) | set(df['moving'].unique())
     
-    # 按section数字排序
+    # sort by section number
     def extract_number(section_name):
         try:
-            # 提取section_后面的数字
+            # extract number after section_
             return int(section_name.split('_')[1])
         except:
-            return 999  # 如果无法解析，放在最后
+            return 999  # if cannot parse, put at the end
     
     sorted_sections = sorted(all_sections, key=extract_number)
-    print(f"总共有 {len(sorted_sections)} 个唯一sections")
+    print(f"total unique sections: {len(sorted_sections)}")
     return sorted_sections
 
 def find_top_two_pairs_for_section(section, df):
-    """找出指定section的前两个最佳配对"""
-    # 查找包含该section的所有行
+    """find top two best pairs for specified section"""
+    # find all rows containing the specified section
     mask_fixed = df['fixed'] == section
     mask_moving = df['moving'] == section
     
-    # 合并所有相关行
+    # merge all relevant rows
     relevant_rows = df[mask_fixed | mask_moving].copy()
     
     if len(relevant_rows) == 0:
         return []
     
-    # 收集所有配对和分数
+    # collect all pairs and scores
     pairs = []
     for _, row in relevant_rows.iterrows():
         if row['fixed'] == section:
@@ -210,21 +210,21 @@ def find_top_two_pairs_for_section(section, df):
             'direction': direction
         })
     
-    # 按分数排序，取前两个
+    # sort by score, take top two
     pairs.sort(key=lambda x: x['score'], reverse=True)
     return pairs[:2]
 
 def main():
-    # 加载数据
+    # load data
     df = load_csv('new_pairwise_filtered.csv')
     
-    # 获取所有sections
+    # get all sections
     all_sections = get_all_sections(df)
     
-    # 找出每个section的前两个最佳配对
+    # find top two best pairs for each section
     results = []
     
-    print(f"\n开始分析每个section的前两个最佳配对...")
+    print(f"\nstart analyzing top two best pairs for each section...")
     
     for section in all_sections:
         top_pairs = find_top_two_pairs_for_section(section, df)
@@ -239,17 +239,17 @@ def main():
             for i, pair in enumerate(top_pairs, 1):
                 print(f"  {i}. -> {pair['other_section']:20s} (score: {pair['score']:.4f}) [{pair['direction']}]")
         else:
-            print(f"{section:20s}: 无配对")
+            print(f"{section:20s}: no pairs")
     
-    # 保存结果到文件
+    # save results to file
     output_file = 'top_two_pairs_for_each_section.txt'
     with open(output_file, 'w') as f:
-        f.write("Section前两个最佳配对分析结果\n")
+        f.write("Top two best pairs for each section\n")
         f.write("=" * 60 + "\n\n")
-        f.write(f"总sections数: {len(all_sections)}\n")
-        f.write(f"分析时间: {pd.Timestamp.now()}\n\n")
+        f.write(f"total sections: {len(all_sections)}\n")
+        f.write(f"analysis time: {pd.Timestamp.now()}\n\n")
         
-        f.write("格式: Section -> 配对1 (分数) [方向] -> 配对2 (分数) [方向]\n")
+        f.write("format: Section -> pair1 (score) [direction] -> pair2 (score) [direction]\n")
         f.write("-" * 60 + "\n")
         
         for result in results:
@@ -263,9 +263,9 @@ def main():
             else:
                 f.write(f"{section:20s} -> N/A -> N/A\n")
         
-        # 添加统计信息
+        # add statistics
         f.write("\n" + "=" * 60 + "\n")
-        f.write("统计信息:\n")
+        f.write("statistics:\n")
         
         all_scores = []
         for result in results:
@@ -273,31 +273,31 @@ def main():
                 all_scores.append(pair['score'])
         
         if all_scores:
-            f.write(f"平均分数: {np.mean(all_scores):.4f}\n")
-            f.write(f"最高分数: {np.max(all_scores):.4f}\n")
-            f.write(f"最低分数: {np.min(all_scores):.4f}\n")
-            f.write(f"分数标准差: {np.std(all_scores):.4f}\n")
+            f.write(f"average score: {np.mean(all_scores):.4f}\n")
+            f.write(f"highest score: {np.max(all_scores):.4f}\n")
+            f.write(f"lowest score: {np.min(all_scores):.4f}\n")
+            f.write(f"score standard deviation: {np.std(all_scores):.4f}\n")
         
         sections_with_pairs = sum(1 for r in results if len(r['pairs']) > 0)
-        f.write(f"有配对的sections: {sections_with_pairs}/{len(all_sections)}\n")
+        f.write(f"sections with pairs: {sections_with_pairs}/{len(all_sections)}\n")
     
-    print(f"\n结果已保存到: {output_file}")
+    print(f"\nresults saved to: {output_file}")
     
-    # 显示一些统计信息
+    # show some statistics
     all_scores = []
     for result in results:
         for pair in result['pairs']:
             all_scores.append(pair['score'])
     
     if all_scores:
-        print(f"\n统计信息:")
-        print(f"平均分数: {np.mean(all_scores):.4f}")
-        print(f"最高分数: {np.max(all_scores):.4f}")
-        print(f"最低分数: {np.min(all_scores):.4f}")
-        print(f"分数标准差: {np.std(all_scores):.4f}")
+        print(f"\nstatistics:")
+        print(f"average score: {np.mean(all_scores):.4f}")
+        print(f"highest score: {np.max(all_scores):.4f}")
+        print(f"lowest score: {np.min(all_scores):.4f}")
+        print(f"score standard deviation: {np.std(all_scores):.4f}")
     
     sections_with_pairs = sum(1 for r in results if len(r['pairs']) > 0)
-    print(f"有配对的sections: {sections_with_pairs}/{len(all_sections)}")
+    print(f"sections with pairs: {sections_with_pairs}/{len(all_sections)}")
 
 if __name__ == "__main__":
     main() 
