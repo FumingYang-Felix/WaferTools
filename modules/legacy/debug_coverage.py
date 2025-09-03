@@ -1,16 +1,16 @@
 #!/usr/bin/env python3
 """
-debug_coverage.py - 调试覆盖率问题
+debug_coverage.py - debug coverage problem
 """
 
 def check_original_coverage():
-    """检查原始链的覆盖率"""
-    print("检查原始链的覆盖率...")
+    """check coverage of original chains"""
+    print("check coverage of original chains...")
     
-    # 原始链的sections
+    # original chains' sections
     original_sections = set()
     
-    # 从rigid_chains_result.txt中提取所有sections
+    # extract all sections from rigid_chains_result.txt
     chains = [
         ['section_1_r01_c01', 'section_13_r01_c01'],
         ['section_39_r01_c01', 'section_15_r01_c01', 'section_52_r01_c01', 'section_3_r01_c01'],
@@ -57,19 +57,19 @@ def check_original_coverage():
     for chain in chains:
         original_sections.update(chain)
     
-    print(f"原始链覆盖的sections数: {len(original_sections)}")
-    print(f"原始链的sections: {sorted(original_sections)}")
+    print(f"original chains cover {len(original_sections)} sections")
+    print(f"original chains' sections: {sorted(original_sections)}")
     
     return original_sections
 
 def check_updated_coverage():
-    """检查更新后组件的覆盖率"""
-    print("\n检查更新后组件的覆盖率...")
+    """check coverage of updated components"""
+    print("\ncheck coverage of updated components...")
     
-    # 更新后组件的sections
+    # updated components' sections
     updated_sections = set()
     
-    # 更新后的组件
+    # updated components
     components = [
         ['section_1_r01_c01', 'section_13_r01_c01'],
         ['section_39_r01_c01', 'section_15_r01_c01', 'section_52_r01_c01', 'section_3_r01_c01', 'section_34_r01_c01'],
@@ -112,31 +112,31 @@ def check_updated_coverage():
     for comp in components:
         updated_sections.update(comp)
     
-    print(f"更新后组件覆盖的sections数: {len(updated_sections)}")
-    print(f"更新后组件的sections: {sorted(updated_sections)}")
+    print(f"updated components cover {len(updated_sections)} sections")
+    print(f"updated components' sections: {sorted(updated_sections)}")
     
     return updated_sections
 
 def compare_coverage():
-    """比较覆盖率"""
+    """compare coverage"""
     original = check_original_coverage()
     updated = check_updated_coverage()
     
-    print(f"\n比较覆盖率:")
-    print(f"原始链覆盖: {len(original)} sections")
-    print(f"更新后覆盖: {len(updated)} sections")
+    print(f"\ncompare coverage:")
+    print(f"original chains cover {len(original)} sections")
+    print(f"updated components cover {len(updated)} sections")
     
     missing = original - updated
     if missing:
-        print(f"丢失的sections ({len(missing)}): {sorted(missing)}")
+        print(f"missing sections ({len(missing)}): {sorted(missing)}")
     else:
-        print("没有丢失sections")
+        print("no missing sections")
     
     gained = updated - original
     if gained:
-        print(f"新增的sections ({len(gained)}): {sorted(gained)}")
+        print(f"new sections ({len(gained)}): {sorted(gained)}")
     else:
-        print("没有新增sections")
+        print("no new sections")
 
 if __name__ == "__main__":
     compare_coverage() 
