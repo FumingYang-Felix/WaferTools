@@ -13,7 +13,7 @@ ORDER_FILE = 'improved_order.txt'
 IMAGE_DIR = 'w7_png_4k'
 OUTPUT_STACK = 'stacked_noalign_4k.tif'
 
-# 读取顺序
+# read order
 with open(ORDER_FILE, 'r') as f:
     order = f.read().strip().split()
 
