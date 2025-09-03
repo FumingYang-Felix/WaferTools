@@ -89,12 +89,12 @@ class DownsampledSAMDetector:
                 # Configure SAM 1 mask generator
                 self.mask_generator = SamAutomaticMaskGenerator(
                     model=sam,
-                    points_per_side=32,           # 减少点采样密度，避免zig-zag
-                    pred_iou_thresh=0.8,          # 提高IoU阈值，获得更高质量的mask
-                    stability_score_thresh=0.9,    # 提高稳定性阈值
+                    points_per_side=32,           # reduce point sampling density, avoid zig-zag
+                    pred_iou_thresh=0.8,          # increase IoU threshold, get higher quality mask
+                    stability_score_thresh=0.9,    # increase stability threshold
                     crop_n_layers=1,              # Multi-scale cropping
                     crop_n_points_downscale_factor=2,
-                    min_mask_region_area=800,     # 增加最小区域面积，过滤小片段
+                    min_mask_region_area=800,     # increase minimum region area, filter small fragments
                 )
                 self.predictor_type = "sam1"
                 
