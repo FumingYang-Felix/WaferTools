@@ -9,9 +9,9 @@ import argparse
 
 def stack_images_with_resize(order_file, image_dir, output_file, size=2048):
     """
-    按顺序读取图片，resize为size*size，堆叠保存为tif
+    read images in order, resize to size*size, stack and save as tif
     """
-    # 读取顺序
+    # read order
     with open(order_file) as f:
         order = f.read().strip().split()
     print(f"Loaded order with {len(order)} sections")
@@ -55,9 +55,9 @@ import argparse
 
 def stack_images_with_resize(order_file, image_dir, output_file, size=2048):
     """
-    按顺序读取图片，resize为size*size，堆叠保存为tif
+    read images in order, resize to size*size, stack and save as tif
     """
-    # 读取顺序
+    # read order
     with open(order_file) as f:
         order = f.read().strip().split()
     print(f"Loaded order with {len(order)} sections")
