@@ -21,7 +21,7 @@ While developed for HI-MC, the modules are broadly applicable to wafer-based con
 - GPU optional. SAM will use CUDA if available, otherwise CPU.
 - Place SAM checkpoints in the project root (recommended) or `cache/`:
 
-`s`am_vit_h.pth`, `sam_vit_l.pth`, `sam_vit_b.pth`
+`sam_vit_h.pth`, `sam_vit_l.pth`, `sam_vit_b.pth`
 
 ---
 
