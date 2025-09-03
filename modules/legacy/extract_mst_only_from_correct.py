@@ -1,4 +1,4 @@
-# 指定的56个section
+# specified 56 sections
 mst_sections = [
     'section_106_r01_c01', 'section_105_r01_c01', 'section_45_r01_c01', 'section_60_r01_c01',
     'section_100_r01_c01', 'section_87_r01_c01', 'section_91_r01_c01', 'section_53_r01_c01',
@@ -24,7 +24,9 @@ filtered = [s for s in order if s in mst_sections]
 with open('correct_order_mst_only.txt', 'w') as f:
     f.write(' '.join(filtered))
 
-print(f"保留了{len(filtered)}个section，已写入correct_order_mst_only.txt") 
+print(f"kept {len(filtered)} sections, saved to correct_order_mst_only.txt") 
+
+# specified 56 sections
 mst_sections = [
     'section_106_r01_c01', 'section_105_r01_c01', 'section_45_r01_c01', 'section_60_r01_c01',
     'section_100_r01_c01', 'section_87_r01_c01', 'section_91_r01_c01', 'section_53_r01_c01',
@@ -50,7 +52,7 @@ filtered = [s for s in order if s in mst_sections]
 with open('correct_order_mst_only.txt', 'w') as f:
     f.write(' '.join(filtered))
 
-print(f"保留了{len(filtered)}个section，已写入correct_order_mst_only.txt") 
+print(f"kept {len(filtered)} sections, saved to correct_order_mst_only.txt") 
  
  
  
