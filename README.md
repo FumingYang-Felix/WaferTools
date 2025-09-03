@@ -20,7 +20,7 @@ While developed for HI-MC, the modules are broadly applicable to wafer-based con
 - Requirements: Python 3.10–3.12, macOS/Windows/Linux.
 - GPU optional. SAM will use CUDA if available, otherwise CPU.
 - Place SAM checkpoints in the project root (recommended) or `cache/`:
-
+(if you don't have - software will download it for you at the first time you running the section segmentation, may take a few minutes)
 `sam_vit_h.pth`, `sam_vit_l.pth`, `sam_vit_b.pth`
 
 ---
