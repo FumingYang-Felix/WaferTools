@@ -23,16 +23,16 @@ from concurrent.futures import ProcessPoolExecutor, as_completed
 import pandas as pd
 from tqdm import tqdm
 from skimage.metrics import structural_similarity as ssim
-# --- SIFT 缓存相关 ---
+# --- SIFT cache related ---
 import pickle, hashlib
 from pathlib import Path
 from functools import partial 
-CACHE_DIR = Path("sift_cache")          # 你可以改到别的固定路径
+CACHE_DIR = Path("sift_cache")          # you can change to other fixed path
 CACHE_DIR.mkdir(exist_ok=True)
 
 
 def _prep_job(path, args_dict):
-    """单张 section → 生成或跳过 cache，返回友好信息"""
+    """single section → generate or skip cache, return friendly information"""
     img = cv2.imread(str(path))
     if img is None:
         return f"✗ {Path(path).name} (read fail)"
@@ -88,14 +88,14 @@ def texture_rich_color_invariant_preprocessing(image):
 def _cache_key(img_path: str, resize: float,
                sift_features: int, sift_contrast: float, sift_edge: int) -> Path:
     """
-    依据   图像文件内容+所有 SIFT 参数+resize 因子
-    生成唯一 md5 → sift_cache/<md5>.pkl
+    generate unique md5 → sift_cache/<md5>.pkl
+    based on image file content + all SIFT parameters + resize factor
     """
-    # ① 文件内容 md5（防止同名文件被改动）
+    # ① file content md5 (prevent same name file from being modified)
     with open(img_path, "rb") as f:
         md5 = hashlib.md5(f.read()).hexdigest()
 
-    # ② 把参数也哈到 key 里，确保改了参数就会重新计算
+    # ② put parameters into key, ensure re-calculation when parameters are changed
     key = f"{md5}_{resize}_{sift_features}_{sift_contrast}_{sift_edge}"
     fname = hashlib.md5(key.encode()).hexdigest() + ".pkl"
     return CACHE_DIR / fname
@@ -142,20 +142,20 @@ def perform_sift_alignment(img1, img2, section1_name, section2_name, img1_path, 
     def _detect_or_load(img, img_path, resize_factor):
         ck = _cache_key(
             img_path,
-            resize=resize_factor,                     # 注意：这里 1.0 指的是 *该函数内* 已经 resize 过的 img
+            resize=resize_factor,                     # note: here 1.0 means *the img has been resized* in this function
             sift_features=sift_features,
             sift_contrast=sift_contrast,
             sift_edge=sift_edge
         )
         if ck.exists():
-            # 秒级加载
+            # load in seconds
             with open(ck, "rb") as f:
                 kp_xy, des = pickle.load(f)
             kp = [cv2.KeyPoint(float(x), float(y), 1.0) for x, y in kp_xy]
             return kp, des
-        # 计算
+        # calculate
         kp, des = sift.detectAndCompute(img, None)
-        # 仅当有 keypoints 时才缓存
+        # only cache when there are keypoints
         if kp and des is not None:
             kp_xy = np.float32([k.pt for k in kp])
             with open(ck, "wb") as f:
@@ -520,10 +520,10 @@ def main():
         run_all_pairs(args)
         return
 
-    # 在 main() 里解析完 args 之后立刻加一行（方便后面引用）
+    # add this line after parsing args in main() (for later reference)
     current_resize = args.resize
 
-    # ---------------- single-pair legacy mode ---------------- #
+    # ---------------- single-pair legacy mode ---------------- # 
     section1_name = f"section_{args.section1}_r01_c01"
     section2_name = f"section_{args.section2}_r01_c01"
     img1_path = find_image_path(args.folder, section1_name)
@@ -622,7 +622,7 @@ def _pair_job(job):
     # Pass SIFT parameters to perform_sift_alignment
     results = perform_sift_alignment(
         img1, img2, name1, name2,
-        path_a,          # img1_path  ← 真正的文件路径
+        path_a,          # img1_path  ← the real file path
         path_b,          # img2_path
         args.resize,     # current_resize
         sift_features=getattr(args, 'sift_features', 3000),
@@ -668,7 +668,7 @@ def run_all_pairs(args):
         return
 
     # ------------------------------------------------------------
-    # 收集所有切片路径
+    # collect all slice paths
     # ------------------------------------------------------------
     img_paths = sorted(list(folder.glob("*.png")) + list(folder.glob("*.tif")))
     if len(img_paths) < 2:
@@ -676,7 +676,7 @@ def run_all_pairs(args):
         return
 
     # ------------------------------------------------------------
-    # A. 并行预计算 / 读取 SIFT 缓存
+    # A. parallel pre-compute / read SIFT cache
     # ------------------------------------------------------------
     print(f"Pre-computing SIFT cache for {len(img_paths)} sections …")
 
@@ -696,10 +696,10 @@ def run_all_pairs(args):
     print("🎉  Cache build finished.\n")
 
     # ------------------------------------------------------------
-    # B. 正式 pair-wise 配准
+    # B. formal pair-wise alignment
     # ------------------------------------------------------------
     out_dir = Path(args.out_dir).expanduser().resolve()
-    out_dir.mkdir(parents=True, exist_ok=True)   # ← 加这一行！
+    out_dir.mkdir(parents=True, exist_ok=True)   # add this line!
     # overlay_dir = out_dir / "overlays"
     # overlay_dir.mkdir(parents=True, exist_ok=True)
 
