@@ -349,18 +349,18 @@ def draw_global_match_lines(folder, chain_file, resize=0.15, output_path='global
     heights = [img.shape[0] for img in images]
     widths = [img.shape[1] for img in images]
     canvas_height = max(heights)
-    # offsets只记录每个section左上角x坐标
+    # offsets only record the left-top x coordinate of each section
     gap_px = 100
     offsets = [0]
     for w in widths[:-1]:
         offsets.append(offsets[-1] + w + gap_px)
     canvas_width = sum(widths) + gap_px * (len(widths) - 1)
-    # 主图
+    # main image
     canvas = np.ones((canvas_height, canvas_width, 3), dtype=np.uint8) * 255
     for i, img in enumerate(images):
         h, w = img.shape[:2]
         canvas[:h, offsets[i]:offsets[i]+w] = img
-    # label行
+    # label row
     label_height = 150
     label_img = np.ones((label_height, canvas_width, 3), dtype=np.uint8) * 255
     font = cv2.FONT_HERSHEY_SIMPLEX
@@ -375,7 +375,7 @@ def draw_global_match_lines(folder, chain_file, resize=0.15, output_path='global
         text_x = x0 + (w - text_w) // 2
         text_y = label_height // 2 + text_h // 2
         cv2.putText(label_img, text, (text_x, text_y), font, font_scale, (0,0,0), font_thickness, cv2.LINE_AA)
-    # overlays和match lines
+    # overlays and match lines
     overlays = []
     overlay_heights = []
     for i in range(len(images)-1):
@@ -412,13 +412,13 @@ def draw_global_match_lines(folder, chain_file, resize=0.15, output_path='global
             overlays.append(None)
             overlay_heights.append(0)
             continue
-        # 画绿色match lines在canvas上（pt1=offsets[i]，pt2=offsets[i+1]）
+        # draw green match lines on canvas (pt1=offsets[i], pt2=offsets[i+1])
         for match, inlier in zip(good_matches, inliers.flatten()):
             if inlier:
                 pt1 = np.array(kp1[match.queryIdx].pt) + [offsets[i], 0]
                 pt2 = np.array(kp2[match.trainIdx].pt) + [offsets[i+1], 0]
                 cv2.line(canvas, tuple(pt1.astype(int)), tuple(pt2.astype(int)), (0,255,0), 1)
-        # 生成overlay，居中于gap
+        # generate overlay, centered in gap
         h2, w2 = img2.shape[:2]
         aligned_img1 = cv2.warpAffine(img1, M, (w2, h2))
         overlay = np.zeros((h2, w2, 3), dtype=np.uint8)
@@ -429,13 +429,13 @@ def draw_global_match_lines(folder, chain_file, resize=0.15, output_path='global
         overlay[mask, 2] = aligned_img1[mask, 2]
         overlays.append(overlay)
         overlay_heights.append(h2)
-    # overlay行
+    # overlay row
     max_overlay_height = max(overlay_heights) if overlay_heights else 0
     overlay_row = np.ones((max_overlay_height, canvas_width, 3), dtype=np.uint8) * 40
     for i, overlay in enumerate(overlays):
         if overlay is not None:
             h, w = overlay.shape[:2]
-            # overlay严格居中于gap
+            # overlay strictly centered in gap
             gap_left = offsets[i] + widths[i]
             gap_right = offsets[i+1]
             gap_center = (gap_left + gap_right) // 2
@@ -444,7 +444,7 @@ def draw_global_match_lines(folder, chain_file, resize=0.15, output_path='global
             if x1 - x0 < w:
                 overlay = overlay[:, :x1-x0]
             overlay_row[:h, x0:x1] = overlay
-    # 合并label、主图和overlay
+    # merge label, main image and overlay
     gap = 20
     total_height = label_height + canvas_height + gap + max_overlay_height
     final_img = np.ones((total_height, canvas_width, 3), dtype=np.uint8) * 40
@@ -497,18 +497,18 @@ def draw_global_match_lines_s_shape(folder, chain_file, resize=0.15, output_path
     heights = [img.shape[0] for img in images]
     widths = [img.shape[1] for img in images]
     n_sections = len(images)
-    # 3. 分行分配section，S形排列
+    # 3. distribute sections by rows, S-shape arrangement
     rows = []
     idx = 0
     while idx < n_sections:
         row = list(range(idx, min(idx+max_sections_per_row, n_sections)))
         rows.append(row)
         idx += max_sections_per_row
-    # S形：偶数行正序，奇数行逆序
+    # S-shape: even rows forward, odd rows reverse
     for i, row in enumerate(rows):
         if i % 2 == 1:
             row.reverse()
-    # 4. 逐行拼接主图和overlay
+    # 4. concatenate main image and overlay row by row
     label_height = 150
     font = cv2.FONT_HERSHEY_SIMPLEX
     font_scale = 3.0
@@ -579,13 +579,13 @@ def draw_global_match_lines_s_shape(folder, chain_file, resize=0.15, output_path
                 overlays.append(None)
                 overlay_heights.append(0)
                 continue
-            # 画绿色match lines在row_canvas上
+            # draw green match lines on row_canvas
             for match, inlier in zip(good_matches, inliers.flatten()):
                 if inlier:
                     pt1 = np.array(kp1[match.queryIdx].pt) + [row_offsets[i], 0]
                     pt2 = np.array(kp2[match.trainIdx].pt) + [row_offsets[i+1], 0]
                     cv2.line(row_canvas, tuple(pt1.astype(int)), tuple(pt2.astype(int)), (0,255,0), 1)
-            # 生成overlay，居中于gap
+            # generate overlay, centered in gap
             h2, w2 = img2.shape[:2]
             aligned_img1 = cv2.warpAffine(img1, M, (w2, h2))
             overlay = np.zeros((h2, w2, 3), dtype=np.uint8)
@@ -596,7 +596,7 @@ def draw_global_match_lines_s_shape(folder, chain_file, resize=0.15, output_path
             overlay[mask, 2] = aligned_img1[mask, 2]
             overlays.append(overlay)
             overlay_heights.append(h2)
-        # overlay行
+        # overlay row
         max_overlay_height = max(overlay_heights) if overlay_heights else 0
         overlay_row = np.ones((max_overlay_height, row_canvas_width, 3), dtype=np.uint8) * 40
         for i, overlay in enumerate(overlays):
@@ -614,7 +614,7 @@ def draw_global_match_lines_s_shape(folder, chain_file, resize=0.15, output_path
         row_labels.append(label_img)
         row_overlays.append(overlay_row)
         row_overlay_heights.append(max_overlay_height)
-    # 5. 竖直拼接所有行
+    # 5. concatenate all rows vertically
     gap_row = 40
     total_height = 0
     total_width = max([c.shape[1] for c in row_canvases])
@@ -624,7 +624,7 @@ def draw_global_match_lines_s_shape(folder, chain_file, resize=0.15, output_path
     y = 0
     for i in range(len(row_canvases)):
         w = row_canvases[i].shape[1]
-        # 居中对齐
+        # center align
         x = (total_width - w) // 2
         final_img[y:y+label_height, x:x+w] = row_labels[i]
         y += label_height
@@ -686,7 +686,7 @@ def draw_global_match_lines_with_overlap_arrows(folder, chain_file, resize=0.15,
     font = cv2.FONT_HERSHEY_SIMPLEX
     font_scale = 3.0
     font_thickness = 8
-    # 第一行：section label
+    # first row: section label
     label_img = np.ones((label_height, canvas_width, 3), dtype=np.uint8) * 255
     for i, sec in enumerate(section_order):
         w = widths[i]
@@ -696,13 +696,13 @@ def draw_global_match_lines_with_overlap_arrows(folder, chain_file, resize=0.15,
         text_x = x0 + (w - text_w) // 2
         text_y = label_height // 2 + text_h // 2
         cv2.putText(label_img, text, (text_x, text_y), font, font_scale, (0,0,0), font_thickness, cv2.LINE_AA)
-    # 第一行：主图
+    # first row: main image
     canvas_height = max(heights)
     canvas = np.ones((canvas_height, canvas_width, 3), dtype=np.uint8) * 255
     for i, img in enumerate(images):
         h, w = img.shape[:2]
         canvas[:h, offsets[i]:offsets[i]+w] = img
-    # 第二行：overlay
+    # second row: overlay
     overlays = []
     overlay_heights = []
     overlap_imgs = []
@@ -747,13 +747,13 @@ def draw_global_match_lines_with_overlap_arrows(folder, chain_file, resize=0.15,
             overlap_imgs.append(None)
             overlap_heights.append(0)
             continue
-        # 画绿色match lines在canvas上
+        # draw green match lines on canvas
         for match, inlier in zip(good_matches, inliers.flatten()):
             if inlier:
                 pt1 = np.array(kp1[match.queryIdx].pt) + [offsets[i], 0]
                 pt2 = np.array(kp2[match.trainIdx].pt) + [offsets[i+1], 0]
                 cv2.line(canvas, tuple(pt1.astype(int)), tuple(pt2.astype(int)), (0,255,0), 1)
-        # 生成overlay
+        # generate overlay
         h2, w2 = img2.shape[:2]
         aligned_img1 = cv2.warpAffine(img1, M, (w2, h2))
         overlay = np.zeros((h2, w2, 3), dtype=np.uint8)
@@ -764,14 +764,14 @@ def draw_global_match_lines_with_overlap_arrows(folder, chain_file, resize=0.15,
         overlay[mask, 2] = aligned_img1[mask, 2]
         overlays.append(overlay)
         overlay_heights.append(h2)
-        # 生成overlap alpha blend（只保留overlap区域）
+        # generate overlap alpha blend (only keep overlap region)
         overlap_mask = (aligned_img1.sum(axis=2) > 0) & (img2.sum(axis=2) > 0)
         alpha_blend = cv2.addWeighted(aligned_img1, 0.5, img2, 0.5, 0)
         overlap_img = np.zeros_like(img2)
         overlap_img[overlap_mask] = alpha_blend[overlap_mask]
         overlap_imgs.append(overlap_img)
         overlap_heights.append(h2)
-    # overlay行和overlap行都只画n-1个块，居中在gap中心，严格上下对齐
+    # overlay row and overlap row both only draw n-1 blocks, centered in gap center, strictly aligned vertically
     overlay_row = np.ones((max_overlay_height, canvas_width, 3), dtype=np.uint8) * 40
     overlap_row = np.ones((max_overlap_height, canvas_width, 3), dtype=np.uint8) * 40
     for i in range(n_sections-1):
@@ -799,7 +799,7 @@ def draw_global_match_lines_with_overlap_arrows(folder, chain_file, resize=0.15,
             y0 = (max_overlap_height - h) // 2
             overlap_row[y0:y0+h, x0:x1] = overlap_img
             cv2.rectangle(overlap_row, (x0, y0), (x1-1, y0+h-1), (255,255,255), 4)
-    # 拼接三行
+    # concatenate three rows
     gap1 = 20
     gap2 = 40
     total_height = label_height + canvas_height + gap1 + max_overlay_height + gap2 + max_overlap_height
@@ -811,36 +811,36 @@ def draw_global_match_lines_with_overlap_arrows(folder, chain_file, resize=0.15,
     final_img[y:y+canvas_height, :, :] = canvas
     y += canvas_height
     y += gap1
-    overlay_y0 = y  # <-- 这里定义overlay_y0
+    overlay_y0 = y  # <-- define overlay_y0 here
     final_img[y:y+max_overlay_height, :, :] = overlay_row
     y += max_overlay_height
     y += gap2
     final_img[y:y+max_overlap_height, :, :] = overlap_row
 
-    # ====== PIL画连线 ======
+    # ====== PIL draw lines ======
     from PIL import Image, ImageDraw
     pil_img = Image.fromarray(final_img.astype(np.uint8))
     draw = ImageDraw.Draw(pil_img)
-    # 计算第一排每个图片的下边中点
+    # calculate the bottom center of each image in the first row
     first_row_bottoms = []
     for i in range(n_sections):
         x0 = offsets[i]
         w = widths[i]
         cx = x0 + w//2
-        cy = main_y0 + heights[i]  # 下边y
+        cy = main_y0 + heights[i]  # bottom y
         first_row_bottoms.append((cx, cy))
-    # 计算第二排每个overlay块的上边中点
+    # calculate the top center of each overlay block in the second row
     overlay_top_centers = []
     for i in range(n_sections-1):
         x0 = overlay_x0_list[i]
         w = overlay_w_list[i]
         if x0 is not None and w is not None:
             cx = x0 + w//2
-            cy = overlay_y0  # overlay行的最上边y
+            cy = overlay_y0  # top y of overlay row
             overlay_top_centers.append((cx, cy))
         else:
             overlay_top_centers.append(None)
-    # 画线：每对相邻图片下边中点连到对应overlay块上边中点
+    # draw lines: each pair of adjacent images connect to the corresponding overlay block top center
     for i in range(n_sections-1):
         pt1 = first_row_bottoms[i]
         pt2 = first_row_bottoms[i+1]
@@ -848,24 +848,24 @@ def draw_global_match_lines_with_overlap_arrows(folder, chain_file, resize=0.15,
         if pt_overlay is not None:
             draw.line([pt1, pt_overlay], fill=(255,255,255), width=8)
             draw.line([pt2, pt_overlay], fill=(255,255,255), width=8)
-    # 计算第二排overlay块的下边中点，第三排overlap块的上边中点
+    # calculate the bottom center of each overlay block in the second row, and the top center of each overlap block in the third row
     overlay_bottom_centers = []
     overlap_top_centers = []
     for i in range(n_sections-1):
         x0 = overlay_x0_list[i]
         w = overlay_w_list[i]
         if x0 is not None and w is not None:
-            # overlay下边中点
+            # overlay bottom center
             cx = x0 + w//2
-            cy = overlay_y0 + max_overlay_height  # overlay行的最下边y
+            cy = overlay_y0 + max_overlay_height  # bottom y of overlay row
             overlay_bottom_centers.append((cx, cy))
-            # overlap上边中点
-            overlap_cy = overlay_y0 + max_overlay_height + gap  # overlap行的最上边y
+            # overlap top center
+            overlap_cy = overlay_y0 + max_overlay_height + gap  # top y of overlap row
             overlap_top_centers.append((cx, overlap_cy))
         else:
             overlay_bottom_centers.append(None)
             overlap_top_centers.append(None)
-    # 画线：overlay下边中点连到overlap上边中点
+    # draw lines: each pair of adjacent images connect to the corresponding overlay block bottom center and overlap block top center
     for i in range(n_sections-1):
         pt_overlay_bottom = overlay_bottom_centers[i]
         pt_overlap_top = overlap_top_centers[i]
@@ -925,7 +925,7 @@ def draw_global_match_lines_with_overlap_split_aligned(folder, chain_file, resiz
     font = cv2.FONT_HERSHEY_SIMPLEX
     font_scale = 3.0
     font_thickness = 8
-    # 第一行：section label
+    # first row: section label
     label_img = np.ones((label_height, canvas_width, 3), dtype=np.uint8) * 255
     for i, sec in enumerate(section_order):
         w = widths[i]
@@ -935,19 +935,19 @@ def draw_global_match_lines_with_overlap_split_aligned(folder, chain_file, resiz
         text_x = x0 + (w - text_w) // 2
         text_y = label_height // 2 + text_h // 2
         cv2.putText(label_img, text, (text_x, text_y), font, font_scale, (0,0,0), font_thickness, cv2.LINE_AA)
-    # 第一行：主图
+    # first row: main image
     canvas_height = max(heights)
     canvas = np.ones((canvas_height, canvas_width, 3), dtype=np.uint8) * 255
     for i, img in enumerate(images):
         h, w = img.shape[:2]
         canvas[:h, offsets[i]:offsets[i]+w] = img
-    # 计算每对section之间gap的中心坐标
+    # calculate the center coordinates of each gap between sections
     gap_centers = []
     for i in range(n_sections-1):
         left = offsets[i] + widths[i]
         right = offsets[i+1]
         gap_centers.append((left + right) // 2)
-    # 第二行：overlay块
+    # second row: overlay blocks
     overlays = []
     overlay_heights = []
     overlap_imgs = []
@@ -1000,13 +1000,13 @@ def draw_global_match_lines_with_overlap_split_aligned(folder, chain_file, resiz
             block_widths.append(0)
             block_heights.append(0)
             continue
-        # 画绿色match lines在canvas上
+        # draw green match lines on canvas
         for match, inlier in zip(good_matches, inliers.flatten()):
             if inlier:
                 pt1 = np.array(kp1[match.queryIdx].pt) + [offsets[i], 0]
                 pt2 = np.array(kp2[match.trainIdx].pt) + [offsets[i+1], 0]
                 cv2.line(canvas, tuple(pt1.astype(int)), tuple(pt2.astype(int)), (0,255,0), 1)
-        # 生成overlay
+        # generate overlay
         h2, w2 = img2.shape[:2]
         aligned_img1 = cv2.warpAffine(img1, M, (w2, h2))
         overlay = np.zeros((h2, w2, 3), dtype=np.uint8)
@@ -1017,7 +1017,7 @@ def draw_global_match_lines_with_overlap_split_aligned(folder, chain_file, resiz
         overlay[mask, 2] = aligned_img1[mask, 2]
         overlays.append(overlay)
         overlay_heights.append(h2)
-        # 生成overlap alpha blend（只保留overlap区域）
+        # generate overlap alpha blend (only keep overlap region)
         overlap_mask = (aligned_img1.sum(axis=2) > 0) & (img2.sum(axis=2) > 0)
         alpha_blend = cv2.addWeighted(aligned_img1, 0.5, img2, 0.5, 0)
         overlap_img = np.zeros_like(img2)
@@ -1026,11 +1026,11 @@ def draw_global_match_lines_with_overlap_split_aligned(folder, chain_file, resiz
         overlap_heights.append(h2)
         block_widths.append(w2)
         block_heights.append(h2)
-    # 统一大间隙
+    # uniform large gap
     max_overlay_height = max(overlay_heights) if overlay_heights else 0
     max_overlap_height = max(overlap_heights) if overlap_heights else 0
     gap = max(40, int(max_overlay_height / 5))
-    # overlay行分块对齐gap中心
+    # overlay row align gap center
     overlay_row = np.ones((max_overlay_height, canvas_width, 3), dtype=np.uint8) * 40
     for i, overlay in enumerate(overlays):
         if overlay is not None:
@@ -1042,26 +1042,26 @@ def draw_global_match_lines_with_overlap_split_aligned(folder, chain_file, resiz
                 overlay = overlay[:, :x1-x0]
             y0 = (max_overlay_height - h) // 2
             overlay_row[y0:y0+h, x0:x1] = overlay
-    # overlap行分块对齐到每个section的白色边框内，且和overlay严格对齐
-    overlap_row = np.ones((max_overlap_height, canvas_width, 3), dtype=np.uint8) * 40  # 灰色底
+    # overlap row align to each section's white border, and strictly align with overlay
+    overlap_row = np.ones((max_overlap_height, canvas_width, 3), dtype=np.uint8) * 40  # gray background
     for i, overlap_img in enumerate(overlap_imgs):
         if overlap_img is not None:
             h, w = overlap_img.shape[:2]
-            # 目标区域：第i+1个section的白色边框区域，和overlay一致
+            # target region: the white border area of the (i+1)-th section, and overlay
             sec_x0 = offsets[i+1]
             sec_w = widths[i+1]
-            # section区域内先填充为灰色
+            # fill the section area with gray first
             overlap_row[:, sec_x0:sec_x0+sec_w] = 40
-            # overlap块在section区域内居中
+            # overlap block centered in section area
             x0 = sec_x0 + max(0, (sec_w - w)//2)
             x1 = min(sec_x0 + sec_w, x0 + w)
             if x1 - x0 < w:
                 overlap_img = overlap_img[:, :x1-x0]
             y0 = (max_overlap_height - h) // 2
             overlap_row[y0:y0+h, x0:x1] = overlap_img
-            # section区域画白色边框
+            # draw white border in section area
             cv2.rectangle(overlap_row, (sec_x0, y0), (sec_x0+sec_w-1, y0+h-1), (255,255,255), 4)
-    # 计算overlay块的左上角x0和宽度w，第三排overlap块直接用相同的x0、w
+    # calculate the left-top x0 and width w of overlay block, and the third row overlap block directly use the same x0 and w
     overlay_row = np.ones((max_overlay_height, canvas_width, 3), dtype=np.uint8) * 40
     overlap_row = np.ones((max_overlap_height, canvas_width, 3), dtype=np.uint8) * 40
     overlay_x0_list = []
@@ -1073,7 +1073,7 @@ def draw_global_match_lines_with_overlap_split_aligned(folder, chain_file, resiz
             x_center = gap_centers[i]
             x0 = x_center - w//2
             x1 = x0 + w
-            # 边界处理
+            # boundary handling
             if x0 < 0:
                 overlay = overlay[:, -x0:]
                 x0 = 0
@@ -1088,14 +1088,14 @@ def draw_global_match_lines_with_overlap_split_aligned(folder, chain_file, resiz
         else:
             overlay_x0_list.append(None)
             overlay_w_list.append(None)
-    # overlap块与overlay块左对齐，宽度一致
+    # overlap block align with overlay block left, width consistent
     for i in range(n_sections-1):
         overlap_img = overlap_imgs[i]
         x0 = overlay_x0_list[i]
         w = overlay_w_list[i]
         if overlap_img is not None and x0 is not None and w is not None:
             h, ow = overlap_img.shape[:2]
-            # 居中贴到overlay块区域，多余裁剪
+            # center align to overlay block area, extra crop
             if ow > w:
                 overlap_img = overlap_img[:, (ow-w)//2:(ow-w)//2+w]
             elif ow < w:
@@ -1105,7 +1105,7 @@ def draw_global_match_lines_with_overlap_split_aligned(folder, chain_file, resiz
             y0 = (max_overlap_height - h) // 2
             overlap_row[y0:y0+h, x0:x0+w] = overlap_img
             cv2.rectangle(overlap_row, (x0, y0), (x0+w-1, y0+h-1), (255,255,255), 4)
-    # 拼接三行
+    # concatenate three rows
     total_height = label_height + canvas_height + gap + max_overlay_height + gap + max_overlap_height
     final_img = np.ones((total_height, canvas_width, 3), dtype=np.uint8) * 40
     y = 0
@@ -1115,36 +1115,36 @@ def draw_global_match_lines_with_overlap_split_aligned(folder, chain_file, resiz
     final_img[y:y+canvas_height, :, :] = canvas
     y += canvas_height
     y += gap
-    overlay_y0 = y  # <-- 这里定义overlay_y0
+    overlay_y0 = y  # <-- define overlay_y0 here
     final_img[y:y+max_overlay_height, :, :] = overlay_row
     y += max_overlay_height
     y += gap
     final_img[y:y+max_overlap_height, :, :] = overlap_row
 
-    # ====== PIL画连线 ======
+    # ====== PIL draw lines ======
     from PIL import Image, ImageDraw
     pil_img = Image.fromarray(final_img.astype(np.uint8))
     draw = ImageDraw.Draw(pil_img)
-    # 计算第一排每个图片的下边中点
+    # calculate the bottom center of each image in the first row
     first_row_bottoms = []
     for i in range(n_sections):
         x0 = offsets[i]
         w = widths[i]
         cx = x0 + w//2
-        cy = main_y0 + heights[i]  # 下边y
+        cy = main_y0 + heights[i]  # bottom y
         first_row_bottoms.append((cx, cy))
-    # 计算第二排每个overlay块的上边中点
+    # calculate the top center of each overlay block in the second row
     overlay_top_centers = []
     for i in range(n_sections-1):
         x0 = overlay_x0_list[i]
         w = overlay_w_list[i]
         if x0 is not None and w is not None:
             cx = x0 + w//2
-            cy = overlay_y0  # overlay行的最上边y
+            cy = overlay_y0  # top y of overlay row
             overlay_top_centers.append((cx, cy))
         else:
             overlay_top_centers.append(None)
-    # 画线：每对相邻图片下边中点连到对应overlay块上边中点
+    # draw lines: each pair of adjacent images connect to the corresponding overlay block top center
     for i in range(n_sections-1):
         pt1 = first_row_bottoms[i]
         pt2 = first_row_bottoms[i+1]
@@ -1152,24 +1152,24 @@ def draw_global_match_lines_with_overlap_split_aligned(folder, chain_file, resiz
         if pt_overlay is not None:
             draw.line([pt1, pt_overlay], fill=(255,255,255), width=line_width)
             draw.line([pt2, pt_overlay], fill=(255,255,255), width=line_width)
-    # 计算第二排overlay块的下边中点，第三排overlap块的上边中点
+    # calculate the bottom center of each overlay block in the second row, and the top center of each overlap block in the third row
     overlay_bottom_centers = []
     overlap_top_centers = []
     for i in range(n_sections-1):
         x0 = overlay_x0_list[i]
         w = overlay_w_list[i]
         if x0 is not None and w is not None:
-            # overlay下边中点
+            # overlay bottom center
             cx = x0 + w//2
-            cy = overlay_y0 + max_overlay_height  # overlay行的最下边y
+            cy = overlay_y0 + max_overlay_height  # bottom y of overlay row
             overlay_bottom_centers.append((cx, cy))
-            # overlap上边中点
-            overlap_cy = overlay_y0 + max_overlay_height + gap  # overlap行的最上边y
+            # overlap top center
+            overlap_cy = overlay_y0 + max_overlay_height + gap  # top y of overlap row
             overlap_top_centers.append((cx, overlap_cy))
         else:
             overlay_bottom_centers.append(None)
             overlap_top_centers.append(None)
-    # 画线：overlay下边中点连到overlap上边中点
+    # draw lines: each pair of adjacent images connect to the corresponding overlay block bottom center and overlap block top center
     for i in range(n_sections-1):
         pt_overlay_bottom = overlay_bottom_centers[i]
         pt_overlap_top = overlap_top_centers[i]
