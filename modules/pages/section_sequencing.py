@@ -6,7 +6,7 @@ import subprocess
 import threading
 import time
 
-# ========== UI布局 ==========
+# ========== UI layout ==========
 sequencing_layout = html.Div([
     html.H2("Section Sequencing", className="mb-4 text-primary"),
     # 1. Select Images Folder (multi-file)
@@ -75,16 +75,16 @@ sequencing_layout = html.Div([
 
     dbc.Row([                                                    # <<<
         dbc.Col(                                                # <<<
-            dcc.Upload(                                         # 上传按钮包在 Upload 里
+            dcc.Upload(                                         # upload button wrapped in Upload
                 id="raw-csv-upload",
                 children=dbc.Button("Upload raw CSV",
                                     color="secondary",
-                                    className="w-100"),         # 全宽
+                                    className="w-100"),         # full width
                 multiple=False,
                 accept=".csv",
                 style={"width": "100%"},
             ),
-            width=6                                             # 半宽
+            width=6                                             # half width
         ),
         dbc.Col(
             dbc.Button("Clean CSV Results",
@@ -135,7 +135,7 @@ sequencing_layout = html.Div([
     dcc.Store(id="sift-log-path"),
 ])
 
-# ========== 后端日志线程 ==========
+# ========== backend log thread ==========
 sift_log_lines = []
 sift_log_lock = threading.Lock()
 sift_running = False
@@ -159,7 +159,7 @@ def run_sift_and_log(cmd, log_path):
     sift_running = False
     print(f"[DEBUG] SIFT thread ended")
 
-# ========== 回调注册 ==========
+# ========== callback registration ==========
 def register_sequencing_callbacks(app):
     # 1. Select Images Folder, take common prefix as folder path
     @app.callback(
@@ -209,7 +209,7 @@ def register_sequencing_callbacks(app):
     @app.callback(
         # Output('sequencing-status', 'children'),
         Output('sift-log-path', 'data'),
-        Output('sift-log-interval', 'disabled', allow_duplicate=True),      # <<< 新增
+        Output('sift-log-interval', 'disabled', allow_duplicate=True),      # <<< new
         Input('run-sift-alignment-btn', 'n_clicks'),
         State('images-folder-store', 'data'),
         State('sift-resize-slider', 'value'),
@@ -261,10 +261,10 @@ def register_sequencing_callbacks(app):
         threading.Thread(target=run_sift_and_log, args=(cmd, log_path), daemon=True).start()
         return (
             log_path,
-            False                                           # <<< False = 开启轮询
+            False                                           # <<< False = start polling
         )
     # 4. Interval to pull logs (only callback writing sift-log-output and sift-log-interval.disabled)
-    # ---- 保持 Output 顺序一致 ----
+    # ---- keep Output order consistent ----
     @app.callback(
         Output('sift-log-output', 'children'),
         Output('sift-log-interval', 'disabled'),
@@ -278,9 +278,9 @@ def register_sequencing_callbacks(app):
             with open(log_path, 'r', errors='ignore') as f:
                 log = f.read()[-10000:]
 
-        # 根据关键字判断是否结束（按你脚本里实际输出改）
+        # determine if finished based on keywords (modify according to actual output in script)
         finished = ('thread ended' in log) or ('CSV written' in log)
-        return log, finished            # <<< 第二个返回值控制 disabled 
+        return log, finished            # <<< second return value controls disabled
 
     # 5. Select CSV file
 
@@ -354,11 +354,11 @@ def register_sequencing_callbacks(app):
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
         if result.returncode == 0:
             info_lines = result.stdout.strip().splitlines()
-            info = '\n'.join(info_lines[:2])  # 只取前两行
+            info = '\n'.join(info_lines[:2])  # only take first two lines
             with open(output_file, 'r', encoding='utf-8', errors='ignore') as f:
                 txt_content = f.read()
             display_text = info + '\n' + txt_content if info else txt_content
-            # 写 meta 到当前时间文件夹
+            # write meta to current time folder
             try:
                 from modules.common.io import save_meta
                 save_meta(ts_dir, {
@@ -383,10 +383,10 @@ def register_sequencing_callbacks(app):
             raise dash.exceptions.PreventUpdate
         try:
             subprocess.run(['pkill', '-f', 'sift_pairwise_alignment.py'], check=False)
-            return True      # <<< True = 立即停轮询
+            return True      # <<< True = stop polling immediately
         except Exception as e:
             return f"Failed to stop SIFT: {e}", True
-    # --- A. 上传 raw CSV → 启用 Clean 按钮 -------------------------------
+    # --- A. upload raw CSV → enable Clean button -------------------------------
     @app.callback(
         Output('csv-file-store', 'data'),
         Output('raw-csv-filename', 'children'),
@@ -407,7 +407,7 @@ def register_sequencing_callbacks(app):
             f.write(data)
         return path, html.Code(fname), False   # disabled=False
 
-    # --- B. 上传 CLEAN csv → 启用 Build 按钮 -----------------------------
+    # --- B. upload CLEAN csv → enable Build button -----------------------------
     @app.callback(
         Output('clean-csv-file-store', 'data'),
         Output('clean-csv-filename', 'children'),
@@ -428,7 +428,7 @@ def register_sequencing_callbacks(app):
             f.write(data)
         return path, html.Code(fname), False   # disabled=False
  
-    # 参数Label实时显示当前值
+    # parameter label shows current value in real-time
     @app.callback(Output('sift-resize-label', 'children'), Input('sift-resize-slider', 'value'))
     def update_resize_label(v):
         return f'Resize ({v:.2f})'
