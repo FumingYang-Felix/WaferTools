@@ -4,22 +4,22 @@ import numpy as np
 import argparse
 
 def greedy_chain_order(df):
-    # 获取所有section
+    # get all sections
     all_sections = sorted(set(df['fixed'].unique()) | set(df['moving'].unique()))
     used = set()
     chains = []
     
-    # 按ssim降序排列所有pair
+    # sort all pairs by ssim in descending order
     pairs = df.sort_values('ssim', ascending=False)[['fixed', 'moving', 'ssim']].values.tolist()
     
-    # 逐步构建链
+    # build chains step by step
     for fixed, moving, ssim in pairs:
         if fixed not in used and moving not in used:
             chains.append([fixed, moving])
             used.add(fixed)
             used.add(moving)
         elif fixed in used and moving not in used:
-            # 尝试接到链尾
+            # try to connect to the chain tail
             for chain in chains:
                 if chain[-1] == fixed:
                     chain.append(moving)
@@ -31,7 +31,7 @@ def greedy_chain_order(df):
                     chain.insert(0, fixed)
                     used.add(fixed)
                     break
-    # 合并所有链
+    # merge all chains
     while len(chains) > 1:
         merged = False
         for i in range(len(chains)):
@@ -45,7 +45,7 @@ def greedy_chain_order(df):
                 break
         if not merged:
             break
-    # 补充未覆盖的section
+    # fill uncovered sections
     final_chain = chains[0] if chains else []
     for s in all_sections:
         if s not in final_chain:
@@ -64,7 +64,7 @@ def main():
     with open(output_file, 'w') as f:
         f.write(' '.join(order))
     print(f"Saved order to {output_file}")
-    # 对比目标
+    # compare with target
     if args.target:
         with open(args.target, 'r') as f:
             target = f.read().strip().split()
@@ -83,22 +83,22 @@ import numpy as np
 import argparse
 
 def greedy_chain_order(df):
-    # 获取所有section
+    # get all sections
     all_sections = sorted(set(df['fixed'].unique()) | set(df['moving'].unique()))
     used = set()
     chains = []
     
-    # 按ssim降序排列所有pair
+    # sort all pairs by ssim in descending order
     pairs = df.sort_values('ssim', ascending=False)[['fixed', 'moving', 'ssim']].values.tolist()
     
-    # 逐步构建链
+    # build chains step by step
     for fixed, moving, ssim in pairs:
         if fixed not in used and moving not in used:
             chains.append([fixed, moving])
             used.add(fixed)
             used.add(moving)
         elif fixed in used and moving not in used:
-            # 尝试接到链尾
+            # try to connect to the chain tail
             for chain in chains:
                 if chain[-1] == fixed:
                     chain.append(moving)
@@ -110,7 +110,7 @@ def greedy_chain_order(df):
                     chain.insert(0, fixed)
                     used.add(fixed)
                     break
-    # 合并所有链
+    # merge all chains
     while len(chains) > 1:
         merged = False
         for i in range(len(chains)):
@@ -124,7 +124,7 @@ def greedy_chain_order(df):
                 break
         if not merged:
             break
-    # 补充未覆盖的section
+    # fill uncovered sections
     final_chain = chains[0] if chains else []
     for s in all_sections:
         if s not in final_chain:
@@ -143,7 +143,7 @@ def main():
     with open(output_file, 'w') as f:
         f.write(' '.join(order))
     print(f"Saved order to {output_file}")
-    # 对比目标
+    # compare with target
     if args.target:
         with open(args.target, 'r') as f:
             target = f.read().strip().split()
