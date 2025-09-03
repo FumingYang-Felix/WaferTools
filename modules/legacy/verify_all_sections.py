@@ -1,22 +1,22 @@
 #!/usr/bin/env python3
 """
-verify_all_sections.py - 验证每个section是否都能形成链
+verify_all_sections.py - verify if each section can form a chain
 
-简单验证：每个section都应该能形成至少长度为2的链
+simple verification: each section should be able to form a chain of at least length 2
 """
 
 import re
 from typing import Dict, List, Set
 
 def parse_best_pairs(filename: str) -> Dict[str, List[str]]:
-    """解析best pairs文件，返回每个section的最佳配对"""
+    """parse best pairs file, return best pairs for each section"""
     best_pairs = {}
     
     with open(filename, 'r', encoding='utf-8') as f:
         lines = f.readlines()
     
     for line in lines:
-        # 匹配格式: section_X -> section_Y (score: Z) [direction]
+        # match format: section_X -> section_Y (score: Z) [direction]
         match = re.match(r'(\w+)\s+->\s+(\w+)\s+\(score:\s+[\d.]+\)', line)
         if match:
             section1, section2 = match.groups()
@@ -27,26 +27,26 @@ def parse_best_pairs(filename: str) -> Dict[str, List[str]]:
     return best_pairs
 
 def verify_section_chain(section: str, best_pairs: Dict[str, List[str]]) -> List[str]:
-    """验证单个section是否能形成链"""
+    """verify if a single section can form a chain"""
     if section not in best_pairs or not best_pairs[section]:
         return []
     
-    # 获取最佳配对
+    # get best pair
     best_pair = best_pairs[section][0]
     
-    # 检查最佳配对是否也有配对
+    # check if best pair has a pair
     if best_pair in best_pairs and best_pairs[best_pair]:
         return [section, best_pair]
     else:
         return [section]
 
 def main():
-    # 解析best pairs文件
-    print("解析best pairs文件...")
+    # parse best pairs file
+    print("parsing best pairs file...")
     best_pairs = parse_best_pairs('top_two_pairs_for_each_section.txt')
-    print(f"解析完成，共 {len(best_pairs)} 个sections")
+    print(f"parsing completed, total {len(best_pairs)} sections")
     
-    print("\n验证每个section的链...")
+    print("\nverifying each section's chain...")
     print("=" * 60)
     
     all_chains = []
@@ -58,34 +58,34 @@ def main():
         if len(chain) >= 2:
             all_chains.append(chain)
             covered_sections.update(chain)
-            print(f"{section}: {' -> '.join(chain)} (长度: {len(chain)})")
+            print(f"{section}: {' -> '.join(chain)} (length: {len(chain)})")
         else:
-            print(f"{section}: 无法形成链")
+            print(f"{section}: cannot form a chain")
     
-    print(f"\n统计结果:")
-    print(f"总sections数: {len(best_pairs)}")
-    print(f"能形成链的sections数: {len(covered_sections)}")
-    print(f"覆盖率: {len(covered_sections)/len(best_pairs)*100:.1f}%")
+    print(f"\nstatistics:")
+    print(f"total sections: {len(best_pairs)}")
+    print(f"sections that can form a chain: {len(covered_sections)}")
+    print(f"coverage: {len(covered_sections)/len(best_pairs)*100:.1f}%")
     
-    # 检查未覆盖的sections
+    # check uncovered sections
     uncovered = set(best_pairs.keys()) - covered_sections
     if uncovered:
-        print(f"\n未覆盖的sections ({len(uncovered)}):")
+        print(f"\nuncovered sections ({len(uncovered)}):")
         for section in sorted(uncovered):
             if section in best_pairs and best_pairs[section]:
                 best_pair = best_pairs[section][0]
-                print(f"  {section} -> {best_pair} (但{best_pair}没有最佳配对)")
+                print(f"  {section} -> {best_pair} (but {best_pair} has no best pair)")
             else:
-                print(f"  {section} (没有最佳配对)")
+                print(f"  {section} (has no best pair)")
     
-    # 检查是否有sections没有最佳配对
+    # check if there are sections without best pairs
     sections_without_pairs = []
     for section in best_pairs.keys():
         if not best_pairs[section]:
             sections_without_pairs.append(section)
     
     if sections_without_pairs:
-        print(f"\n没有最佳配对的sections ({len(sections_without_pairs)}):")
+        print(f"\nsections without best pairs ({len(sections_without_pairs)}):")
         for section in sections_without_pairs:
             print(f"  {section}")
 
