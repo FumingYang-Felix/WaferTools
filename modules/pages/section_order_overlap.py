@@ -14,7 +14,7 @@ import tifffile
 from modules.sequencing.sequential_alignment import draw_global_match_lines_with_overlap_split_aligned
 from modules.sequencing.generate_aligned_tif_stack import generate_aligned_tif_stack
 
-# ========== UI布局 ==========
+# ========== UI layout ==========
 overlap_layout = html.Div([
     html.H2("Order Visualization", className="mb-4 text-primary"),
     dbc.Row([
@@ -93,7 +93,7 @@ overlap_layout = html.Div([
     ], align="start", className="g-2"),
 ])
 
-# ========== 后端逻辑 ==========
+# ========== backend logic ==========
 def parse_image(contents):
     content_type, content_string = contents.split(',')
     decoded = base64.b64decode(content_string)
@@ -110,17 +110,17 @@ def parse_chain_txt(contents):
     import re
     content_type, content_string = contents.split(',')
     decoded = base64.b64decode(content_string).decode('utf-8')
-    # 提取STEP 5部分
+    # extract STEP 5 part
     m = re.search(r'STEP 5.*?final single chain.*?[:：]\s*(.*?)\n', decoded, re.DOTALL)
     if m:
         chain_line = m.group(1)
-        # 提取section_x的数字
+        # extract numbers of section_x
         ids = [s.split('_')[1] for s in chain_line.split('->') if 'section_' in s]
         return ids, chain_line
     return [], ""
 
 def draw_overlay(images, csvs, order_map=None):
-    # 只用第一张图片为底图
+    # use the first image as the base image
     if not images or not csvs:
         return None
     base_img = images[0].copy()
@@ -129,45 +129,45 @@ def draw_overlay(images, csvs, order_map=None):
 
     for df in csvs:
         for _, row in df.iterrows():
-            # ---- 1) 解析中心坐标 --------------------------------------
+            # ---- 1) parse center coordinates --------------------------------------
             raw = row.get("center_coordinates")
             if raw is None:
                 continue
 
-            # 把字符串安全转成 Python 对象
+            # convert string to Python object safely
             if isinstance(raw, str):
                 coords = ast.literal_eval(raw)
             else:
                 coords = raw
 
-            # 可能是 [x, y] 或 [[x, y]]
+            # maybe [x, y] or [[x, y]]
             if isinstance(coords[0], (list, tuple)):
                 x, y = coords[0][:2]
             else:
                 x, y = coords[:2]
             x, y = int(x), int(y)
 
-            # ---- 2) 解析 section id -----------------------------------
+            # ---- 2) parse section id -----------------------------------
             name = str(row.get("id", "?"))
             section_id = name.split("_", 1)[1] if name.startswith("section_") else name
 
-            # ---- 3) 决定tag内容 ---------------------------------------
+            # ---- 3) decide tag content ---------------------------------------
             if order_map and section_id in order_map:
                 tag = order_map[section_id]
             else:
                 tag = section_id
 
-            # ---- 4) 画背景矩形 + 文本 ---------------------------------
+            # ---- 4) draw background rectangle + text ---------------------------------
 
-            # ➊ 计算字号 / pad
+            # ➊ calculate font size / pad
             W, H = base_img.size
             font_size = max(int(min(W, H) * 0.02), 36)
             pad = int(font_size * 0.4)
 
-            # ➋ 尝试加载常见字体
+            # ➋ try to load common fonts
             font = None
             for path in [
-                "arial.ttf",                                   # Windows 缺省
+                "arial.ttf",                                   # Windows default
                 "/Library/Fonts/Arial.ttf",                    # macOS
                 "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",  # Linux + Pillow
             ]:
@@ -185,16 +185,16 @@ def draw_overlay(images, csvs, order_map=None):
 
             pad = int(font_size * 0.4)
 
-            # ➋ 用 font 计算文字宽高
+            # ➋ use font to calculate text width and height
             bbox = font.getbbox(tag)
             w, h = bbox[2] - bbox[0], bbox[3] - bbox[1]
 
-            # ➌ 再画矩形 & 文本
+            # ➌ draw rectangle & text
             rect = [x - w//2 - pad, y - h//2 - pad,
                     x + w//2 + pad, y + h//2 + pad]
 
             draw.rectangle(rect, fill=(0, 0, 0, 200))
-            for dx, dy in [(-1,0),(1,0),(0,-1),(0,1)]:   # 黑描边
+            for dx, dy in [(-1,0),(1,0),(0,-1),(0,1)]:   # black outline
                 draw.text((x - w//2 + dx, y - h//2 + dy),
                         tag, font=font, fill=(0, 0, 0, 255))
             draw.text((x - w//2, y - h//2),
@@ -223,7 +223,7 @@ def get_chain_txt_from_upload(contents):
         f.write(decoded)
     return chain_path
 
-# 注册Dash回调
+# register Dash callbacks
 
 def register_overlap_callbacks(app):
     @app.callback(
@@ -272,9 +272,10 @@ def register_overlap_callbacks(app):
         order_map = None
         if txt_contents:
             ids, _ = parse_chain_txt(txt_contents)
-            # ids是顺序id列表（如['6','1',...])，order_map: section_id -> 顺序号
+            # ids is the list of section ids (e.g. ['6','1',...])
+            # order_map: section_id -> order number
             order_map = {sid: str(i+1) for i, sid in enumerate(ids)}
-        # 生成overlay图像
+        # generate overlay image
         base_img = images[0].copy()
         draw = ImageDraw.Draw(base_img)
         for df in csvs:
@@ -327,7 +328,7 @@ def register_overlap_callbacks(app):
                             tag, font=font, fill=(0, 0, 0, 255))
                 draw.text((x - w//2, y - h//2),
                         tag, font=font, fill=(255, 255, 255, 255))
-        # 保存到统一目录
+        # save to unified directory
         vis_dir = ensure_vis_folder()
         overlay_path = os.path.join(vis_dir, 'overlay_result.png')
         base_img.save(overlay_path)
@@ -339,7 +340,7 @@ def register_overlap_callbacks(app):
             })
         except Exception:
             pass
-        # 转base64返回
+        # convert to base64 and return
         buf = io.BytesIO()
         base_img.save(buf, format='PNG')
         data = base64.b64encode(buf.getvalue()).decode()
@@ -368,7 +369,7 @@ def register_overlap_callbacks(app):
         vis_dir = ensure_vis_folder()
         chain_path = get_chain_txt_from_upload(chain_txt_contents)
         output_path = os.path.join(vis_dir, 'global_match_lines_with_overlap_split_aligned_thumb.png')
-        # 只生成一次缩略图，resize=0.1
+        # only generate one thumbnail, resize=0.1
         draw_global_match_lines_with_overlap_split_aligned(folder, chain_path, resize=0.1, output_path=output_path)
         with open(output_path, 'rb') as f:
             img_bytes = f.read()
@@ -388,9 +389,9 @@ def register_overlap_callbacks(app):
         vis_dir = ensure_vis_folder()
         chain_path = get_chain_txt_from_upload(chain_txt_contents)
         output_path = os.path.join(vis_dir, 'aligned_stack_thumb.tif')
-        # 只生成一次缩略stack，resize=0.1
+        # only generate one thumbnail, resize=0.1
         generate_aligned_tif_stack(folder, chain_path, resize=0.1, output_path=output_path)
-        # 附加写入统一 results 目录（不影响原有输出）
+        # append to unified results directory (does not affect original output)
         try:
             from modules.common.paths import get_run_dir
             from modules.common.io import copy_to, save_meta
