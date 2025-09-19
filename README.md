@@ -205,13 +205,12 @@ Copyright © 2025 Harvard University Lichtman Lab.
 
 We welcome community use and modification for research. Please cite our work and acknowledge the HI-MC project:
 
-- Fuming Yang, Lichtman Lab, “Wafer Tool (Dash) for wafer-based connectomics preprocessing,” Harvard University, 2025.
-- High-Throughput Integrative Mouse Connectomics (HI-MC) project — Harvard, Princeton, MIT, Cambridge, Google, the Allen Institute, Johns Hopkins.
+- Fuming Yang, Lichtman Lab, “WaferTools: Software for High-throughput Integrative Connectomics,” Harvard University, 2025.
 
 **BibTeX example:**
 ```bibtex
 @misc{wafertool2025,
-  title  = {Wafer Tool (Dash): wafer-based connectomics preprocessing},
+  title  = {WaferTools: Software for High-throughput Integrative Connectomics},
   author = {Yang, Fuming and HI-MC Collaboration (Harvard University Lichtman Lab)},
   year   = {2025},
   howpublished = {\url{https://github.com/<your-org>/Polygon_tool_V3}},
