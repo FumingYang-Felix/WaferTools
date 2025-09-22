@@ -213,7 +213,7 @@ We welcome community use and modification for research. Please cite our work and
   title  = {WaferTools: Software for High-throughput Integrative Connectomics},
   author = {F. Yang, Y. Meirovitch, F. Araújo, R. Schalek, V. Susoy, J.W. Lichtman},
   year   = {2025},
-  howpublished = {\url{https://github.com/<your-org>/Polygon_tool_V3}},
+  howpublished = {\url{https://github.com/fumingyang-felix/WaferTools}},
   note   = {Part of the HI-MC project}
 }
 ```
