@@ -209,11 +209,12 @@ We welcome community use and modification for research. Please cite our work and
 
 **BibTeX example:**
 ```bibtex
-@misc{wafertool2025,
-  title  = {WaferTools: Software for High-throughput Integrative Connectomics},
-  author = {F. Yang, Y. Meirovitch, F. Araújo, R. Schalek, V. Susoy, J.W. Lichtman},
+@software{wafertools2025,
+  author = {F. Yang and Y. Meirovitch and F. Araújo and R. Schalek and V. Susoy and J.W. Lichtman},
+  title  = {WaferTools: Software for High-Throughput Integrative Connectomics},
   year   = {2025},
-  howpublished = {\url{https://github.com/fumingyang-felix/WaferTools}}
+  url    = {https://github.com/fumingyang-felix/WaferTools},
+  urldate= {2025-09-23}
 }
 ```
 
