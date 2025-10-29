@@ -7,6 +7,7 @@ Part of the High-Throughput Integrative Mouse Connectomics (HI-MC) project — a
 This software provides an end-to-end workflow for wafer-based connectomics preprocessing:
 
 - Section segmentation with SAM (Segment Anything)
+- Basic imaging
 - Section sequencing via SIFT pairwise alignment, cleaning, and chain building
 - Order visualization and aligned stack preview
 - Unified, reproducible result storage
