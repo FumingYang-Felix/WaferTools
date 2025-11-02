@@ -2,8 +2,6 @@
 
 Copyright © 2025 Harvard University Lichtman Lab.
 
-Part of the High-Throughput Integrative Mouse Connectomics (HI-MC) project — an international collaboration among Harvard, Princeton, MIT, Cambridge, Google, the Allen Institute, and Johns Hopkins.
-
 This software provides an end-to-end workflow for wafer-based connectomics preprocessing:
 
 - Section segmentation with SAM (Segment Anything)
