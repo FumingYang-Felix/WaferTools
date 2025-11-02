@@ -1,4 +1,4 @@
-# WaferTools - Software for High-Throughput Integrative Connectomics Project
+# WaferTools - Software for Wafer-related Automatic Methods in Connectomics
 
 Copyright © 2025 Harvard University Lichtman Lab.
 
