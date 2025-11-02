@@ -2,6 +2,17 @@
 
 Copyright © 2025 Harvard University Lichtman Lab.
 
+<p align="center">
+  <a href="https://www.youtube.com/watch?v=UsmY64RtiGQ">
+    <img src="WaferTools.png" alt="SuperChain demo" width="900">
+  </a>
+  <br/>
+  <a href="https://www.youtube.com/watch?v=UsmY64RtiGQ">
+    <img src="https://img.shields.io/badge/YouTube-Watch-red?logo=youtube" alt="Watch on YouTube">
+  </a>
+</p>
+
+
 This software provides an end-to-end workflow for wafer-based connectomics preprocessing:
 
 - Section segmentation with SAM (Segment Anything)
