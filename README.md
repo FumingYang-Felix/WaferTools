@@ -17,7 +17,7 @@ This software provides an end-to-end workflow for wafer-based connectomics prepr
 
 - Section segmentation with SAM (Segment Anything)
 - Basic imaging
-- Section sequencing via SIFT pairwise alignment, cleaning, and chain building
+- Section ordering via SIFT pairwise alignment, cleaning, and chain building
 - Order visualization and aligned stack preview
 - Unified, reproducible result storage
 
@@ -34,7 +34,7 @@ While developed for HI-MC, the modules are broadly applicable to wafer-based con
 - [Modules and workflows](#modules-and-workflows)
   - [Module index (at a glance)](#module-index-at-a-glance)
   - [1) Section Counter (segmentation)](#1-section-counter-segmentation)
-  - [2) Sequencing (pairwise alignment--clean--chain)](#2-sequencing-pairwise-alignment--clean--chain)
+  - [2) Ordering (pairwise alignment--clean--chain)](#2-Ordering-pairwise-alignment--clean--chain)
   - [3) Order Visualization](#3-order-visualization)
 - [Project structure (selected)](#project-structure-selected)
 - [Dependencies](#dependencies)
@@ -57,7 +57,7 @@ While developed for HI-MC, the modules are broadly applicable to wafer-based con
 ## Online install
 
 ```bash
-cd Polygon_tool_V3
+cd WaferTools_V4
 python3 -m venv .venv
 # macOS/Linux
 source .venv/bin/activate
@@ -76,10 +76,38 @@ pip install --no-index --find-links=offline/wheels -r offline/requirements_offli
 ```
 
 ## Run
+
+### Easy Launch (Recommended)
+
+**macOS:**
+- Double-click `WaferTools.app` in Finder
+- Or double-click `WaferTools.command`
+- The app will automatically check dependencies, activate the virtual environment, and open your browser to `http://127.0.0.1:8050`
+
+**Windows:**
+- Double-click `WaferTools.bat`
+- The app will automatically activate the virtual environment and launch
+
+**Linux/Advanced:**
 ```bash
-python app.py
-# open http://127.0.0.1:8050
+python launcher.py
 ```
+
+### Manual Launch
+
+If you prefer to launch manually or need to troubleshoot:
+
+```bash
+# Activate your virtual environment first
+source .venv/bin/activate  # macOS/Linux
+# .venv\Scripts\activate    # Windows
+
+# Then run the app
+python app.py
+# Open http://127.0.0.1:8050 in your browser
+```
+
+**Note:** The launcher scripts automatically check if the server is already running on port 8050 and will simply open your browser if it is.
 
 ---
 
@@ -160,26 +188,35 @@ WAFER_SAVE_DEBUG_VIS=0|1         # default 0
 ## Project structure (selected)
 
 ```text
-modules/
-  pages/
-    section_counter.py         # Section segmentation UI
-    section_sequencing.py      # SIFT, clean, chain UI
-    section_order_overlap.py   # Visualization UI
-  sequencing/
-    sift_pairwise_alignment.py # SIFT pairwise CLI
-    clean_new_csv.py           # Clean CSV CLI
-    best_pair_chain_graph.py   # Chain builder CLI (adapter)
-    generate_aligned_tif_stack.py
-  section_counter/
-    downsampled_sam.py         # SAM wrapper with downsampling
-  modules/common/
-    io.py, paths.py            # unified result I/O
-results/
-  section_counter/ …          # per-run folders with meta.json
-  sequencing/ …               # logs, cleaned_csv, final_order_chain
-  order_viz/ …                # visualization outputs
-app.py                        # Dash entrypoint
-offline/requirements_offline.txt # pinned deps for offline install
+WaferTools_V4/
+├─ WaferTools.app              # macOS launcher (double-click)
+├─ WaferTools.command          # macOS terminal launcher
+├─ WaferTools.bat              # Windows launcher
+├─ launcher.py                 # Python launcher script
+├─ app.py                      # Dash entrypoint
+├─ modules/
+│  ├─ pages/
+│  │  ├─ section_counter.py         # Section segmentation UI
+│  │  ├─ section_sequencing.py      # SIFT, clean, chain UI
+│  │  └─ section_order_overlap.py   # Visualization UI
+│  ├─ sequencing/
+│  │  ├─ sift_pairwise_alignment.py # SIFT pairwise CLI
+│  │  ├─ clean_new_csv.py           # Clean CSV CLI
+│  │  ├─ best_pair_chain_graph.py   # Chain builder CLI (adapter)
+│  │  └─ generate_aligned_tif_stack.py
+│  ├─ section_counter/
+│  │  └─ downsampled_sam.py         # SAM wrapper with downsampling
+│  └─ common/
+│     ├─ io.py                      # unified result I/O
+│     └─ paths.py
+├─ results/
+│  ├─ section_counter/              # per-run folders with meta.json
+│  ├─ sequencing/                   # logs, cleaned_csv, final_order_chain
+│  └─ order_viz/                    # visualization outputs
+├─ cache/                           # SAM checkpoints (optional location)
+├─ uploads/                         # temporary uploads
+└─ offline/
+   └─ requirements_offline.txt      # pinned deps for offline install
 ```
 
 ---
@@ -206,6 +243,11 @@ Pinned set (see `offline/requirements_offline.txt` for full list and versions):
 - **Multiple browser windows:** The app runs with `debug=False, use_reloader=False` to avoid multi-process reloads.  
 - **Port already in use:** The launcher logic checks port 8050; if occupied, it opens the existing server in the browser.  
 - **Missing SAM checkpoints:** Place `sam_vit_*.pth` in the repo root or `cache/`. The app auto-detects them.
+- **Permission denied on macOS:** If `WaferTools.command` or `WaferTools.app` won't launch, you may need to make them executable:
+  ```bash
+  chmod +x WaferTools.command
+  ```
+  Or right-click → Open (to bypass Gatekeeper for unsigned apps).
 
 ---
 
@@ -215,7 +257,7 @@ Copyright © 2025 Harvard University Lichtman Lab.
 
 We welcome community use and modification for research. Please cite our work and acknowledge the HI-MC project:
 
-- Fuming Yang, Lichtman Lab, “WaferTools: Software for Wafer-related Automatic Methods in Connectomics,” Harvard University, 2025.
+- Fuming Yang, Lichtman Lab, "WaferTools: Software for High-throughput Integrative Connectomics," Harvard University, 2025.
 
 **BibTeX example:**
 ```bibtex
