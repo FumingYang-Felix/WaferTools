@@ -215,7 +215,7 @@ Copyright © 2025 Harvard University Lichtman Lab.
 
 We welcome community use and modification for research. Please cite our work and acknowledge the HI-MC project:
 
-- Fuming Yang, Lichtman Lab, “WaferTools: Software for High-throughput Integrative Connectomics,” Harvard University, 2025.
+- Fuming Yang, Lichtman Lab, “WaferTools: Software for Wafer-related Automatic Methods in Connectomics,” Harvard University, 2025.
 
 **BibTeX example:**
 ```bibtex
