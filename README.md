@@ -221,7 +221,7 @@ We welcome community use and modification for research. Please cite our work and
 ```bibtex
 @software{wafertools2025,
   author = {F. Yang and Y. Meirovitch and F. Araújo and R. Schalek and V. Susoy and J.W. Lichtman},
-  title  = {WaferTools: Software for High-Throughput Integrative Connectomics},
+  title  = {WaferTools: Software for Wafer-related Automatic Methods in Connectomics},
   year   = {2025},
   url    = {https://github.com/fumingyang-felix/WaferTools},
   urldate= {2025-09-23}
