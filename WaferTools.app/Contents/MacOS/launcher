@@ -1,0 +1,11 @@
+#!/bin/bash
+# Get the directory of the app bundle
+APP_DIR="$(cd "$(dirname "$0")/../../.." && pwd)"
+
+# Open Terminal and run launcher with wider window (don't auto-exit)
+osascript <<EOF
+tell application "Terminal"
+    activate
+    do script "cd '$APP_DIR' && printf '\\\\e[8;30;120t' && clear && python3 launcher.py"
+end tell
+EOF
