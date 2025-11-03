@@ -21,7 +21,7 @@ This software provides an end-to-end workflow for wafer-based connectomics prepr
 - Order visualization and aligned stack preview
 - Unified, reproducible result storage
 
-While developed for HI-MC, the modules are broadly applicable to wafer-based connectomics and similar serial-section pipelines.
+While developed for Hi-MC, the modules are broadly applicable to wafer-based connectomics and similar serial-section pipelines.
 
 ---
 
