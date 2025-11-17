@@ -238,7 +238,7 @@ Pinned set (see `offline/requirements_offline.txt` for full list and versions):
 
 ---
 
-## Common issues
+## Common issues 
 
 - **Multiple browser windows:** The app runs with `debug=False, use_reloader=False` to avoid multi-process reloads.  
 - **Port already in use:** The launcher logic checks port 8050; if occupied, it opens the existing server in the browser.  
