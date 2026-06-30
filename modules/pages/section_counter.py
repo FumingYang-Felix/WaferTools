@@ -345,7 +345,7 @@ def process_image_with_auto_generator(image_path, model_type='vit_l'):
 
 # ====== Layout ======
 layout = html.Div([
-    html.H2("Section Counter", className="mb-4 text-primary"),
+    html.H2("Section Segmentation", className="mb-4 text-primary"),
     dbc.Row([
         # Column 1: Upload image
         dbc.Col([
@@ -743,31 +743,34 @@ def register_section_counter_callbacks(app):
                 writer.writerows(out_rows)
         # ---- append writing to unified results directory (does not affect original writing) ----
         try:
-            from modules.common.paths import get_run_dir
+            from modules.common.paths import get_run_dir, resolve_project, prefixed
             from modules.common.io import copy_to, save_meta
-            run_dir = get_run_dir('section_counter')
+            # auto-derive the wafer/project name from the uploaded image
+            proj = resolve_project(image_store.get('original_path') if isinstance(image_store, dict) else None)
+            run_dir = get_run_dir('section_counter', project=proj)
             files_to_copy = []
             if ENABLE_LEGACY_RESULTS:
                 if mask_png_path and os.path.exists(mask_png_path):
-                    files_to_copy.append((mask_png_path, 'mask.png'))
+                    files_to_copy.append((mask_png_path, prefixed('mask.png', proj)))
                 if sections_csv_path and os.path.exists(sections_csv_path):
-                    files_to_copy.append((sections_csv_path, 'sections.csv'))
+                    files_to_copy.append((sections_csv_path, prefixed('sections.csv', proj)))
             else:
                 if not os.path.exists(run_dir):
                     os.makedirs(run_dir)
-                _run_mask_png = os.path.join(run_dir, 'mask.png')
+                _run_mask_png = os.path.join(run_dir, prefixed('mask.png', proj))
                 cv2.imwrite(_run_mask_png, cv2.cvtColor(overlay, cv2.COLOR_RGB2BGR))
-                _run_sections_csv = os.path.join(run_dir, 'sections.csv')
+                _run_sections_csv = os.path.join(run_dir, prefixed('sections.csv', proj))
                 with open(_run_sections_csv, 'w', newline='') as f:
                     writer = csv.writer(f)
                     writer.writerow(['id', 'contour_coordinates', 'area', 'centroid_x', 'centroid_y', 'bbox'])
                     writer.writerows(out_rows)
             mp = image_store.get('masks_path') if isinstance(image_store, dict) else None
             if mp and os.path.exists(mp):
-                files_to_copy.append((mp, 'masks.pkl'))
+                files_to_copy.append((mp, prefixed('masks.pkl', proj)))
             copy_to(run_dir, files_to_copy)
             save_meta(run_dir, {
                 'module': 'section_counter',
+                'project': proj,
                 'export_count': len(out_rows)
             })
         except Exception:

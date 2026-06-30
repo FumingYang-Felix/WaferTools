@@ -3,7 +3,7 @@ import dash
 from dash import dcc, html, Input, Output, State, ctx
 import dash_bootstrap_components as dbc
 import base64
-import io 
+import io
 import pandas as pd
 import numpy as np
 import ast
@@ -19,11 +19,15 @@ import matplotlib
 matplotlib.use('Agg')  # Force non-GUI backend
 import matplotlib.pyplot as plt
 from dash.exceptions import PreventUpdate
-from section_identification.section_detector import automatic_identification
-from section_identification.interactive import run_sam_interactive
-from section_identification.export import export_mask_coordinates
+from modules.section_counter.section_detector import automatic_identification
+from modules.section_counter.interactive import run_sam_interactive
+from modules.section_counter.export import export_mask_coordinates
 from modules.pages.section_counter import layout as section_counter_layout, register_section_counter_callbacks
 from modules.pages.section_sequencing import sequencing_layout, register_sequencing_callbacks
+from modules.common.paths import (
+    get_results_root, set_results_root,
+    get_project_name, set_project_name, is_project_locked,
+)
 import os
 import sys
 import cv2
@@ -144,12 +148,35 @@ app.layout = dbc.Container([
         dbc.Col([
             html.H2("Wafer Tools", className="text-white sidebar-title"),
             dbc.Nav([
-                dbc.NavLink("Section Counter", href="#", id="nav-section-counter", className="nav-link"),
-                dbc.NavLink("Mask Unification & Alignment", href="#", id="nav-segmentation", className="nav-link"),
+                dbc.NavLink("Section Segmentation", href="#", id="nav-section-counter", className="nav-link"),
+                dbc.NavLink("ROI Registration", href="#", id="nav-segmentation", className="nav-link"),
                 dbc.NavLink("EM Imaging", href="#", id="nav-imaging", className="nav-link"),
-                dbc.NavLink("Section Sequencing", href="#", id="nav-sequencing", className="nav-link"),
-                dbc.NavLink("ORDER Visualization", href="#", id="nav-wafer-align", className="nav-link"),
-            ], vertical=True, pills=True, className="sidebar-nav")
+                dbc.NavLink("Section Ordering", href="#", id="nav-sequencing", className="nav-link"),
+                dbc.NavLink("Order Visualization", href="#", id="nav-wafer-align", className="nav-link"),
+            ], vertical=True, pills=True, className="sidebar-nav"),
+            # ---- shared settings: results folder + project / wafer name ----
+            html.Hr(style={"borderColor": "#666"}),
+            html.Div([
+                html.Label("Results folder", className="text-white",
+                           style={"fontSize": "0.8em", "marginBottom": "2px"}),
+                dcc.Input(id="results-root-input", type="text",
+                          value=get_results_root(), debounce=True,
+                          placeholder="default install folder",
+                          style={"width": "100%", "fontSize": "0.78em", "marginBottom": "8px"}),
+                html.Label("Project / wafer name", className="text-white",
+                           style={"fontSize": "0.8em", "marginBottom": "2px"}),
+                dcc.Input(id="project-name-input", type="text",
+                          value=(get_project_name() if is_project_locked() else ""),
+                          debounce=True, placeholder="auto from file name",
+                          style={"width": "100%", "fontSize": "0.78em", "marginBottom": "8px"}),
+                dbc.Button("Save settings", id="save-settings-btn",
+                           color="light", size="sm", className="w-100 mb-1"),
+                html.Div(id="settings-status", className="text-info",
+                         style={"fontSize": "0.72em"}),
+                html.Div(id="current-project-display", className="text-warning",
+                         style={"fontSize": "0.72em", "marginTop": "4px"}),
+                dcc.Interval(id="project-refresh-interval", interval=4000, n_intervals=0),
+            ], className="px-1 mt-2"),
         ], width=2, className="sidebar"),
         dbc.Col([
             html.Div(id='page-content', className="main-content")
@@ -161,7 +188,7 @@ app.layout = dbc.Container([
     dcc.Store(id='deleted-polygons', data=[])
 ], fluid=True, className="custom-container")
 alignment_layout = html.Div([
-    html.H3("Mask Unification & Alignment", className="mb-4 text-primary"),
+    html.H3("ROI Registration", className="mb-4 text-primary"),
     dbc.Row([
         dbc.Col([
             dcc.Upload(
@@ -250,6 +277,41 @@ placeholder_layout = lambda title: html.Div([
         html.P("This feature is under development. Please check back later!", className="text-muted")
     ], className="text-center")
 ], className="graph-container")
+
+
+# ---- shared settings: persist results folder + project/wafer name ----
+@app.callback(
+    Output('settings-status', 'children'),
+    Output('results-root-input', 'value'),
+    Output('project-name-input', 'value'),
+    Input('save-settings-btn', 'n_clicks'),
+    State('results-root-input', 'value'),
+    State('project-name-input', 'value'),
+    prevent_initial_call=True
+)
+def save_settings(n, results_root, project_name):
+    if not n:
+        raise dash.exceptions.PreventUpdate
+    new_root = set_results_root(results_root or '')
+    # empty name -> clears the lock and returns to auto-derive mode
+    proj = set_project_name(project_name or '')
+    if proj:
+        msg = f"✅ Saved. Project locked to '{proj}'."
+    else:
+        msg = "✅ Saved. Project name will auto-derive from each input."
+    return msg, new_root, proj
+
+
+@app.callback(
+    Output('current-project-display', 'children'),
+    Input('project-refresh-interval', 'n_intervals')
+)
+def refresh_current_project(_):
+    p = get_project_name()
+    suffix = "" if is_project_locked() else " (auto)"
+    return f"Current: {p}{suffix}" if p else "Current: (auto, none yet)"
+
+
 @app.callback(Output('page-content', 'children'),
               [Input('nav-section-counter', 'n_clicks'),
                Input('nav-segmentation', 'n_clicks'),
@@ -737,9 +799,10 @@ import matplotlib.pyplot as plt
     State("upload-image", "contents"),
     State("deleted-polygons", "data"),
     State("overlay-options", "value"),
+    State("upload-image", "filename"),
     prevent_initial_call=True
 )
-def export_final(n_clicks, json_data, image_content, deleted_ids, overlay_options):
+def export_final(n_clicks, json_data, image_content, deleted_ids, overlay_options, image_filename=None):
     try:
         deleted_ids = deleted_ids or [] 
         df = pd.read_json(io.StringIO(json_data))
@@ -758,19 +821,22 @@ def export_final(n_clicks, json_data, image_content, deleted_ids, overlay_option
         # Final CSV columns order
         cols = ['id', 'type', 'contour_coordinates', 'center_coordinates', 'rotation']
         ENABLE_LEGACY_RESULTS = bool(int(os.getenv('WAFER_ENABLE_LEGACY_RESULTS', '0')))
-        # unified result directory
+        # unified result directory (auto-derive the wafer/project name from the uploaded image)
         try:
-            from modules.common.paths import get_run_dir
-            run_dir = get_run_dir('mask_unification')
+            from modules.common.paths import get_run_dir, resolve_project, prefixed
+            proj = resolve_project(image_filename)
+            run_dir = get_run_dir('mask_unification', project=proj)
         except Exception:
             # fallback: create a basic timestamped dir if helper unavailable
             import datetime
+            proj = ''
+            prefixed = lambda name, project=None: name
             ts = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
             run_dir = os.path.join('results', 'mask_unification', ts)
             os.makedirs(run_dir, exist_ok=True)
 
         # save CSV primarily to unified directory
-        unified_csv_path = os.path.join(run_dir, 'aligned_polygons.csv')
+        unified_csv_path = os.path.join(run_dir, prefixed('aligned_polygons.csv', proj))
         df_export[cols].to_csv(unified_csv_path, index=False)
         # optionally also write legacy copy
         if ENABLE_LEGACY_RESULTS:
@@ -804,7 +870,7 @@ def export_final(n_clicks, json_data, image_content, deleted_ids, overlay_option
             ax.axis('off')
             plt.tight_layout()
             # save to unified directory first
-            plt.savefig(os.path.join(run_dir, 'filtered_output.png'), dpi=300, bbox_inches='tight')
+            plt.savefig(os.path.join(run_dir, prefixed('filtered_output.png', proj)), dpi=300, bbox_inches='tight')
             # optionally legacy copy
             if ENABLE_LEGACY_RESULTS:
                 plt.savefig(os.path.join('Result_masking', 'filtered_output.png'), dpi=300, bbox_inches='tight')
@@ -815,6 +881,7 @@ def export_final(n_clicks, json_data, image_content, deleted_ids, overlay_option
             from modules.common.io import save_meta
             save_meta(run_dir, {
                 'module': 'mask_unification',
+                'project': proj,
                 'rows': int(len(df_export))
             })
         except Exception:
