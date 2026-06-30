@@ -393,13 +393,16 @@ def register_overlap_callbacks(app):
         generate_aligned_tif_stack(folder, chain_path, resize=0.1, output_path=output_path)
         # append to unified results directory (does not affect original output)
         try:
-            from modules.common.paths import get_run_dir
+            from modules.common.paths import get_run_dir, resolve_project, prefixed
             from modules.common.io import copy_to, save_meta
-            run_dir = get_run_dir('order_viz')
-            copy_to(run_dir, [(output_path, 'aligned_stack_thumb.tif')])
+            # auto-derive the wafer/project name from the selected images folder
+            proj = resolve_project(folder)
+            run_dir = get_run_dir('order_viz', project=proj)
+            copy_to(run_dir, [(output_path, prefixed('aligned_stack_thumb.tif', proj))])
             save_meta(run_dir, {
                 'module': 'order_viz',
-                'artifact': 'aligned_stack_thumb.tif'
+                'project': proj,
+                'artifact': prefixed('aligned_stack_thumb.tif', proj)
             })
         except Exception:
             pass

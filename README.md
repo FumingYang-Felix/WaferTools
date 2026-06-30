@@ -17,11 +17,11 @@ This software provides an end-to-end workflow for wafer-based connectomics prepr
 
 - Section segmentation with SAM (Segment Anything)
 - Basic imaging
-- Section ordering via SIFT pairwise alignment, cleaning, and chain building
+- Section sequencing via SIFT pairwise alignment, cleaning, and chain building
 - Order visualization and aligned stack preview
 - Unified, reproducible result storage
 
-While developed for Hi-MC, the modules are broadly applicable to wafer-based connectomics and similar serial-section pipelines.
+While developed for HI-MC, the modules are broadly applicable to wafer-based connectomics and similar serial-section pipelines.
 
 ---
 
@@ -34,7 +34,7 @@ While developed for Hi-MC, the modules are broadly applicable to wafer-based con
 - [Modules and workflows](#modules-and-workflows)
   - [Module index (at a glance)](#module-index-at-a-glance)
   - [1) Section Counter (segmentation)](#1-section-counter-segmentation)
-  - [2) Ordering (pairwise alignment--clean--chain)](#2-Ordering-pairwise-alignment--clean--chain)
+  - [2) Sequencing (pairwise alignment--clean--chain)](#2-sequencing-pairwise-alignment--clean--chain)
   - [3) Order Visualization](#3-order-visualization)
 - [Project structure (selected)](#project-structure-selected)
 - [Dependencies](#dependencies)
@@ -238,7 +238,7 @@ Pinned set (see `offline/requirements_offline.txt` for full list and versions):
 
 ---
 
-## Common issues 
+## Common issues
 
 - **Multiple browser windows:** The app runs with `debug=False, use_reloader=False` to avoid multi-process reloads.  
 - **Port already in use:** The launcher logic checks port 8050; if occupied, it opens the existing server in the browser.  

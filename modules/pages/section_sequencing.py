@@ -2,13 +2,98 @@ import dash
 from dash import dcc, html, Input, Output, State, ctx
 import dash_bootstrap_components as dbc
 import os
+import sys
 import subprocess
 import threading
 import time
 
+
+# ========== results-path / project-name helpers ==========
+# All sequencing outputs route through the shared results root + project name
+# (auto-derived from the images folder) so folders/files match the other modules:
+#   <results_root>/sequencing/...   files prefixed with "<project>_".
+def _repo_root():
+    return os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..'))
+
+
+def _seq_root():
+    try:
+        from modules.common.paths import get_results_root
+        return os.path.join(get_results_root(), 'sequencing')
+    except Exception:
+        return os.path.join(_repo_root(), 'results', 'sequencing')
+
+
+def _seq_project(source=None):
+    try:
+        from modules.common.paths import resolve_project
+        return resolve_project(source)
+    except Exception:
+        return ''
+
+
+def _pfx(name, proj):
+    try:
+        from modules.common.paths import prefixed
+        return prefixed(name, proj)
+    except Exception:
+        return name
+
+
+def _run_id(proj):
+    try:
+        from modules.common.paths import get_run_id
+        return get_run_id(proj)
+    except Exception:
+        return time.strftime('%Y%m%d_%H%M%S')
+
+
+def _find_script(*relparts_groups):
+    """Return the first existing candidate script path."""
+    for parts in relparts_groups:
+        cand = os.path.join(_repo_root(), *parts)
+        if os.path.exists(cand):
+            return cand
+    return os.path.join(_repo_root(), *relparts_groups[0])
+
+
+def _run_clean_csv(raw_csv, proj):
+    """Clean a raw pairwise CSV -> cleaned CSV under results/sequencing/cleaned_csv."""
+    clean_script = _find_script(
+        ('modules', 'sequencing', 'clean_new_csv.py'),
+        ('clean_new_csv.py',),
+        ('modules', 'legacy', 'clean_new_csv.py'),
+    )
+    cleaned_dir = os.path.join(_seq_root(), 'cleaned_csv')
+    os.makedirs(cleaned_dir, exist_ok=True)
+    base = os.path.basename(raw_csv).rsplit('.', 1)[0]
+    output_csv = os.path.join(cleaned_dir, _pfx(f"{base}_cleaned.csv", proj))
+    cmd = [sys.executable, clean_script, raw_csv, '-o', output_csv]
+    result = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
+    return result, output_csv
+
+
+def _run_build_chains(clean_csv, proj):
+    """Build section chains from a cleaned CSV -> chain_result under
+    results/sequencing/final_order_chain/<project>_<timestamp>/."""
+    result_root = os.path.join(_seq_root(), 'final_order_chain')
+    os.makedirs(result_root, exist_ok=True)
+    ts_dir = os.path.join(result_root, _run_id(proj))
+    os.makedirs(ts_dir, exist_ok=True)
+    output_file = os.path.join(ts_dir, _pfx('chain_result.txt', proj))
+    chains_script = _find_script(
+        ('modules', 'sequencing', 'best_pair_chain_graph.py'),
+        ('best_pair_chain_graph.py',),
+        ('archive_unused_20250829', 'best_pair_chain_graph.py'),
+    )
+    cmd = [sys.executable, chains_script, '--csv', clean_csv, '--output', output_file]
+    result = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
+    return result, output_file, ts_dir
+
+
 # ========== UI layout ==========
 sequencing_layout = html.Div([
-    html.H2("Section Sequencing", className="mb-4 text-primary"),
+    html.H2("Section Ordering", className="mb-4 text-primary"),
     # 1. Select Images Folder (multi-file)
     html.Div([
         html.Label("Images Folder Path:"),
@@ -133,20 +218,24 @@ sequencing_layout = html.Div([
     # html.Div(id='sequencing-status', className='mt-3'),
     html.Div(id='sequencing-results-display', className='border p-3', style={'minHeight': '300px'}),
     dcc.Store(id="sift-log-path"),
+    dcc.Store(id="sift-out-dir-store"),    # folder of the latest SIFT run (for auto pipeline)
+    dcc.Store(id="sift-autorun-store"),    # guard so the auto pipeline runs once per SIFT run
 ])
 
 # ========== backend log thread ==========
 sift_log_lines = []
 sift_log_lock = threading.Lock()
 sift_running = False
+sift_proc = None   # handle to the running SIFT subprocess (for cross-platform Stop)
 
 def run_sift_and_log(cmd, log_path):
-    global sift_running
+    global sift_running, sift_proc
     print(f"[DEBUG] SIFT thread started, log_path={log_path}")
     sift_running = True
     try:
         with open(log_path, 'w') as f:
             proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1)
+            sift_proc = proc
             for line in proc.stdout:
                 f.write(line)
                 f.flush()
@@ -157,6 +246,7 @@ def run_sift_and_log(cmd, log_path):
     except Exception as e:
         print(f"[ERROR] SIFT thread exception: {e}")
     sift_running = False
+    sift_proc = None
     print(f"[DEBUG] SIFT thread ended")
 
 # ========== callback registration ==========
@@ -210,6 +300,8 @@ def register_sequencing_callbacks(app):
         # Output('sequencing-status', 'children'),
         Output('sift-log-path', 'data'),
         Output('sift-log-interval', 'disabled', allow_duplicate=True),      # <<< new
+        Output('sift-out-dir-store', 'data'),                               # <<< new: folder for auto pipeline
+        Output('sift-autorun-store', 'data', allow_duplicate=True),         # <<< new: reset run-once guard
         Input('run-sift-alignment-btn', 'n_clicks'),
         State('images-folder-store', 'data'),
         State('sift-resize-slider', 'value'),
@@ -227,17 +319,18 @@ def register_sequencing_callbacks(app):
     def start_sift(n_clicks, folder, resize, cpu_workers, sift_features, sift_contrast, sift_edge, flann_trees, flann_checks, lowe_ratio, ransac_threshold, min_inlier_ratio):
         if not n_clicks or not folder:
             raise dash.exceptions.PreventUpdate
-        import os
-        # unified results root: <project>/results/sequencing
-        project_root = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..'))
-        result_root = os.path.join(project_root, 'results', 'sequencing')
+        # auto-derive the wafer/project name from the selected images folder
+        proj = _seq_project(folder)
+        # unified results root: <results_root>/sequencing  (user-definable)
+        result_root = _seq_root()
         sift_results_dir = os.path.join(result_root, 'sift_results')
         os.makedirs(sift_results_dir, exist_ok=True)
-        out_dir = os.path.join(sift_results_dir, f"sift_pairwise_out_{int(time.time())}")
-        # Resolve absolute path to modules/sequencing/sift_pairwise_alignment.py from project root
-        sift_script = os.path.join(project_root, 'modules', 'sequencing', 'sift_pairwise_alignment.py')
+        run_id = _run_id(proj)
+        out_dir = os.path.join(sift_results_dir, f"sift_pairwise_out_{run_id}")
+        # Resolve absolute path to modules/sequencing/sift_pairwise_alignment.py from repo root
+        sift_script = os.path.join(_repo_root(), 'modules', 'sequencing', 'sift_pairwise_alignment.py')
         cmd = [
-            'python3', sift_script,
+            sys.executable, sift_script,
             '--folder', folder,
             '--out_dir', out_dir,
             '--resize', str(resize),
@@ -255,13 +348,15 @@ def register_sequencing_callbacks(app):
         # place logs under results/sequencing/logs
         log_dir = os.path.join(result_root, 'logs')
         os.makedirs(log_dir, exist_ok=True)
-        log_path = os.path.join(log_dir, f"sift_log_{int(time.time())}.txt")
+        log_path = os.path.join(log_dir, _pfx(f"sift_log_{run_id}.txt", proj))
         global sift_log_lines
         sift_log_lines = []
         threading.Thread(target=run_sift_and_log, args=(cmd, log_path), daemon=True).start()
         return (
             log_path,
-            False                                           # <<< False = start polling
+            False,                                          # <<< False = start polling
+            out_dir,                                        # <<< remember output folder
+            None                                            # <<< reset auto-run guard
         )
     # 4. Interval to pull logs (only callback writing sift-log-output and sift-log-interval.disabled)
     # ---- keep Output order consistent ----
@@ -282,6 +377,63 @@ def register_sequencing_callbacks(app):
         finished = ('thread ended' in log) or ('CSV written' in log)
         return log, finished            # <<< second return value controls disabled
 
+    # 4b. Auto-run the rest of the pipeline once SIFT finishes (blind to the user):
+    #     locate the just-produced pairwise CSV -> Clean -> Build Chains, no manual
+    #     folder/date selection required.
+    @app.callback(
+        Output('sequencing-results-display', 'children', allow_duplicate=True),
+        Output('sift-autorun-store', 'data', allow_duplicate=True),
+        Input('sift-log-interval', 'disabled'),
+        State('sift-out-dir-store', 'data'),
+        State('sift-autorun-store', 'data'),
+        State('images-folder-store', 'data'),
+        prevent_initial_call=True
+    )
+    def autorun_after_sift(interval_disabled, out_dir, already_done, folder):
+        # only act when polling has just stopped (SIFT finished) and we have an output dir
+        if not interval_disabled or not out_dir:
+            raise dash.exceptions.PreventUpdate
+        if already_done == out_dir:           # already processed this run
+            raise dash.exceptions.PreventUpdate
+        raw_csv = os.path.join(out_dir, 'pairwise_alignment_results.csv')
+        if not os.path.exists(raw_csv):       # SIFT was stopped/failed before writing CSV
+            raise dash.exceptions.PreventUpdate
+
+        proj = _seq_project(folder)
+        # 1) clean the raw pairwise CSV
+        cres, cleaned_csv = _run_clean_csv(raw_csv, proj)
+        if cres.returncode != 0:
+            return html.Pre("Auto pipeline – CSV cleaning failed:\n" + (cres.stderr or '')), out_dir
+        # 2) build the section chain
+        bres, output_file, ts_dir = _run_build_chains(cleaned_csv, proj)
+        if bres.returncode != 0:
+            return html.Pre("Auto pipeline – chain building failed:\n" + (bres.stderr or '')), out_dir
+
+        info = '\n'.join(bres.stdout.strip().splitlines()[:2])
+        try:
+            with open(output_file, 'r', encoding='utf-8', errors='ignore') as f:
+                txt_content = f.read()
+        except Exception:
+            txt_content = ''
+        try:
+            from modules.common.io import save_meta
+            save_meta(ts_dir, {
+                'module': 'sequencing',
+                'project': proj,
+                'artifact': os.path.basename(output_file),
+                'auto': True,
+            })
+        except Exception:
+            pass
+        header = (
+            f"✅ Auto pipeline complete (project: {proj or 'n/a'})\n"
+            f"Raw CSV : {raw_csv}\n"
+            f"Cleaned : {cleaned_csv}\n"
+            f"Chain   : {output_file}\n\n"
+        )
+        body = (info + '\n' if info else '') + txt_content
+        return html.Pre(header + body), out_dir
+
     # 5. Select CSV file
 
 
@@ -298,26 +450,12 @@ def register_sequencing_callbacks(app):
     def clean_csv(n, csv_path):
         if not n or not csv_path:
             raise dash.exceptions.PreventUpdate
-        project_root = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..'))
-        # clean script: prefer modules/sequencing/clean_new_csv.py, fallback to archived path if needed
-        candidate_scripts = [
-            os.path.join(project_root, 'modules', 'sequencing', 'clean_new_csv.py'),
-            os.path.join(project_root, 'clean_new_csv.py'),
-            os.path.join(project_root, 'modules', 'legacy', 'clean_new_csv.py'),
-        ]
-        clean_script = next((p for p in candidate_scripts if os.path.exists(p)), candidate_scripts[0])
-        # unified output path under results/sequencing/cleaned_csv
-        cleaned_dir = os.path.join(project_root, 'results', 'sequencing', 'cleaned_csv')
-        os.makedirs(cleaned_dir, exist_ok=True)
-        base = os.path.basename(csv_path).rsplit('.', 1)[0]
-        output_csv = os.path.join(cleaned_dir, f"{base}_cleaned.csv")
-        cmd = ['python3', clean_script, csv_path, '-o', output_csv]
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
+        proj = _seq_project(csv_path)
+        result, _output_csv = _run_clean_csv(csv_path, proj)
         if result.returncode == 0:
-            return html.Pre(result.stdout if result.returncode==0 else result.stderr)
-
+            return html.Pre(result.stdout)
         else:
-            return html.Pre(result.stderr), "CSV cleaning failed"
+            return html.Pre("CSV cleaning failed:\n" + (result.stderr or ''))
 
     # 8. Select Cleaned CSV
 
@@ -335,41 +473,30 @@ def register_sequencing_callbacks(app):
     def build_chains(n, csv_path):
         if not n or not csv_path:
             raise dash.exceptions.PreventUpdate
-        import os
-        project_root = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..'))
-        result_root = os.path.join(project_root, 'results', 'sequencing', 'final_order_chain')
-        os.makedirs(result_root, exist_ok=True)
-        ts_dir = os.path.join(result_root, time.strftime('%Y%m%d_%H%M%S'))
-        os.makedirs(ts_dir, exist_ok=True)
-        output_file = os.path.join(ts_dir, 'chain_result.txt')
-        project_root = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..'))
-        # prefer modules/sequencing version; fallback to archived root script
-        candidates = [
-            os.path.join(project_root, 'modules', 'sequencing', 'best_pair_chain_graph.py'),
-            os.path.join(project_root, 'best_pair_chain_graph.py'),
-            os.path.join(project_root, 'archive_unused_20250829', 'best_pair_chain_graph.py'),
-        ]
-        chains_script = next((p for p in candidates if os.path.exists(p)), candidates[0])
-        cmd = ['python3', chains_script, '--csv', csv_path, '--output', output_file]
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
+        proj = _seq_project(csv_path)
+        result, output_file, ts_dir = _run_build_chains(csv_path, proj)
         if result.returncode == 0:
             info_lines = result.stdout.strip().splitlines()
             info = '\n'.join(info_lines[:2])  # only take first two lines
-            with open(output_file, 'r', encoding='utf-8', errors='ignore') as f:
-                txt_content = f.read()
+            try:
+                with open(output_file, 'r', encoding='utf-8', errors='ignore') as f:
+                    txt_content = f.read()
+            except Exception:
+                txt_content = ''
             display_text = info + '\n' + txt_content if info else txt_content
-            # write meta to current time folder
+            # write meta to the run folder
             try:
                 from modules.common.io import save_meta
                 save_meta(ts_dir, {
                     'module': 'sequencing',
-                    'artifact': 'chain_result.txt'
+                    'project': proj,
+                    'artifact': os.path.basename(output_file),
                 })
             except Exception:
                 pass
             return html.Pre(display_text)
         else:
-            return html.Pre(result.stderr), "Section chains building failed"
+            return html.Pre("Section chains building failed:\n" + (result.stderr or ''))
 
     # 11. Stop SIFT button handling
     @app.callback(
@@ -381,11 +508,18 @@ def register_sequencing_callbacks(app):
     def stop_sift(n):
         if not n:
             raise dash.exceptions.PreventUpdate
+        # terminate the tracked subprocess (cross-platform; the old pkill was Unix-only)
+        global sift_proc
         try:
-            subprocess.run(['pkill', '-f', 'sift_pairwise_alignment.py'], check=False)
-            return True      # <<< True = stop polling immediately
+            if sift_proc is not None and sift_proc.poll() is None:
+                sift_proc.terminate()
+                try:
+                    sift_proc.wait(timeout=5)
+                except Exception:
+                    sift_proc.kill()
         except Exception as e:
-            return f"Failed to stop SIFT: {e}", True
+            print(f"[ERROR] Failed to stop SIFT: {e}")
+        return True          # <<< True = stop polling immediately
     # --- A. upload raw CSV → enable Clean button -------------------------------
     @app.callback(
         Output('csv-file-store', 'data'),
