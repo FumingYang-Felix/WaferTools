@@ -4,18 +4,55 @@
 
 The program lives in the folder **`D:\WaferTools-main`**.
 
+> **Requirement (one time):** Git must be installed. If it isn't, install it once
+> from <https://git-scm.com/download/win> (just click *Next* through the installer).
+
+---
+
+## Step 0 — First-time setup (do this only once per computer)
+
+Pick the **one** option that matches your situation. You only do this once;
+afterwards you go straight to Step 1 every time.
+
+### Option A — You already have WaferTools, you just want updates (Sync)
+
+Use this if the folder **`D:\WaferTools-main`** already exists on the computer
+(the usual case — e.g. it was installed earlier from a ZIP).
+
+1. Open the folder **`D:\WaferTools-main`**.
+2. Double-click **`Setup_Git_Once.bat`**.
+3. Wait until it says **"Setup complete"**, then close the window.
+   - Your existing data (results, uploads, settings) is **not** touched.
+
+### Option B — Computer doesn't have WaferTools yet (Direct install)
+
+1. Ask Fuming for **`Install.bat`** (one small file). Save it where you want
+   WaferTools to live, e.g. directly on **`D:\`**.
+2. Double-click **`Install.bat`**. It downloads the program into a new
+   **`WaferTools`** folder next to it.
+3. Done — that folder is already update-ready, so you can skip to Step 2 the
+   first time (no separate setup needed).
+
+> Either way, the **first time** the program is fetched onto the computer once.
+> After Step 0 you never download anything by hand again — updates are one click.
+>
+> *Note:* depending on how it was installed, your folder may be named
+> **`WaferTools-main`** or **`WaferTools`**. The files inside (`Update.bat`,
+> `WaferTools.bat`, …) are identical.
+
 ---
 
 ## Step 1 — Update to the latest version (Sync)
 
-Do this whenever Fuming tells you there is a new version.
+Do this whenever Fuming tells you there is a new version (after Step 0 is done once).
 
 1. Open the folder **`D:\WaferTools-main`**.
 2. Double-click **`Update.bat`**.
 3. A black window appears and downloads the latest version. When it says
    **"You now have the latest version"**, you can close the window.
 
-> If it says it can't update, your current version still works — just contact Fuming.
+> If it says it can't update, make sure you did **Step 0** once. Your current
+> version keeps working either way — if unsure, contact Fuming.
 
 ---
 
