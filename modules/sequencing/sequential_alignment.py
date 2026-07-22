@@ -320,10 +320,11 @@ def draw_global_match_lines(folder, chain_file, resize=0.15, output_path='global
                 sections = [s.strip() for s in chain_part.split('->')]
                 return sections
         for line in lines:
-            if 'chain' in line and '->' in line and 'section_' in line:
-                chain_part = line.split(':')[1].strip() if ':' in line else line
-                sections = [s.strip() for s in chain_part.split('->')]
-                return sections
+            if '->' in line and ('final chain' in line.lower() or 'chain' in line.lower()):
+                chain_part = line.split(':', 1)[1].strip() if ':' in line else line
+                sections = [s.strip() for s in chain_part.split('->') if s.strip()]
+                if sections:
+                    return sections
         return None
 
     section_order = parse_chain_file(chain_file)
@@ -468,10 +469,11 @@ def draw_global_match_lines_s_shape(folder, chain_file, resize=0.15, output_path
                 sections = [s.strip() for s in chain_part.split('->')]
                 return sections
         for line in lines:
-            if 'chain' in line and '->' in line and 'section_' in line:
-                chain_part = line.split(':')[1].strip() if ':' in line else line
-                sections = [s.strip() for s in chain_part.split('->')]
-                return sections
+            if '->' in line and ('final chain' in line.lower() or 'chain' in line.lower()):
+                chain_part = line.split(':', 1)[1].strip() if ':' in line else line
+                sections = [s.strip() for s in chain_part.split('->') if s.strip()]
+                if sections:
+                    return sections
         return None
 
     section_order = parse_chain_file(chain_file)
@@ -648,10 +650,11 @@ def draw_global_match_lines_with_overlap_arrows(folder, chain_file, resize=0.15,
                 sections = [s.strip() for s in chain_part.split('->')]
                 return sections
         for line in lines:
-            if 'chain' in line and '->' in line and 'section_' in line:
-                chain_part = line.split(':')[1].strip() if ':' in line else line
-                sections = [s.strip() for s in chain_part.split('->')]
-                return sections
+            if '->' in line and ('final chain' in line.lower() or 'chain' in line.lower()):
+                chain_part = line.split(':', 1)[1].strip() if ':' in line else line
+                sections = [s.strip() for s in chain_part.split('->') if s.strip()]
+                if sections:
+                    return sections
         return None
 
     section_order = parse_chain_file(chain_file)
@@ -887,10 +890,11 @@ def draw_global_match_lines_with_overlap_split_aligned(folder, chain_file, resiz
                 sections = [s.strip() for s in chain_part.split('->')]
                 return sections
         for line in lines:
-            if 'chain' in line and '->' in line and 'section_' in line:
-                chain_part = line.split(':')[1].strip() if ':' in line else line
-                sections = [s.strip() for s in chain_part.split('->')]
-                return sections
+            if '->' in line and ('final chain' in line.lower() or 'chain' in line.lower()):
+                chain_part = line.split(':', 1)[1].strip() if ':' in line else line
+                sections = [s.strip() for s in chain_part.split('->') if s.strip()]
+                if sections:
+                    return sections
         return None
 
     section_order = parse_chain_file(chain_file)

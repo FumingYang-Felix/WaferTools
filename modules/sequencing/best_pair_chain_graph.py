@@ -6,22 +6,30 @@ import argparse
 from collections import Counter, defaultdict
 from itertools import combinations
 from typing import List, Dict, Tuple, Optional
-import re
-from collections import Counter, defaultdict
 
 
-NAME_PAT = r'(?:section_\d+_r01_c01|S_\d+(?:_[A-Za-z0-9]+)*)'
-SEC_PAT  = re.compile(NAME_PAT)
+# Legacy pattern kept for callers that still expect it; main path no longer depends on it.
+NAME_PAT = r'[^\s,->()]+'
+SEC_PAT = re.compile(NAME_PAT)
+# "A -> B" or "A -> B (score: ...)" — names may contain almost anything except "->"
+ARROW_LINE_PAT = re.compile(
+    r'^\s*(?:chain\d+\s*:\s*)?(.+?)\s*->\s*(.+?)(?:\s*\(|\s*$)',
+    re.I,
+)
+SCORE_PAT = re.compile(r'\bscore\s*:\s*([0-9.]+)', re.I)
 
-def section_sort_key(section: str) -> int:
-    m = re.search(r'section_(\d+)_r01_c01', section)
-    if m:
-        return int(m.group(1))
-    m = re.search(r'S_(\d+)', section)
-    if m:
-        return int(m.group(1))
-    m = re.search(r'(\d+)', section)
-    return int(m.group(1)) if m else 0
+
+def section_sort_key(section: str):
+    """Natural-ish sort: first integer in the name if present, else lexicographic."""
+    nums = re.findall(r'\d+', str(section))
+    if nums:
+        return (0, int(nums[0]), str(section))
+    return (1, 0, str(section))
+
+
+def _normalize_section_id(value) -> str:
+    return str(value).strip()
+
 
 def find_best_pairs_from_csv(csvfile):
     best_scores = {}
@@ -31,8 +39,10 @@ def find_best_pairs_from_csv(csvfile):
     with open(csvfile, 'r', encoding='utf-8') as f:
         reader = csv.DictReader(f)
         for row in reader:
-            fixed = row['fixed']
-            moving = row['moving']
+            fixed = _normalize_section_id(row['fixed'])
+            moving = _normalize_section_id(row['moving'])
+            if not fixed or not moving:
+                continue
             score = float(row['score'])
             # fixed perspective
             if fixed not in best_scores or score > best_scores[fixed]:
@@ -61,10 +71,12 @@ def find_best_pairs_from_csv(csvfile):
     return best_pairs, second_best_pairs
 
 
-def build_best_pair_chains(text, hub_threshold=3):
-    edges = re.findall(fr'({NAME_PAT})\s*->\s*({NAME_PAT})', text)
+def _chains_from_edges(edges: List[Tuple[str, str]], hub_threshold: int = 3) -> List[List[str]]:
+    """Build linear chains from undirected best-pair edges (name-agnostic)."""
     graph = defaultdict(set)
     for a, b in edges:
+        if not a or not b or a == b:
+            continue
         graph[a].add(b)
         graph[b].add(a)
     counts = Counter(target for _, target in edges)
@@ -96,6 +108,36 @@ def build_best_pair_chains(text, hub_threshold=3):
 
     chains.sort(key=lambda c: section_sort_key(c[0]))
     return chains
+
+
+def build_best_pair_chains_from_pairs(best_pairs: Dict[str, Tuple[str, float]],
+                                      hub_threshold: int = 3) -> List[List[str]]:
+    """Build chains directly from best-pair dict — works with any section ID strings."""
+    edges = [(src, dst) for src, (dst, _score) in best_pairs.items()]
+    return _chains_from_edges(edges, hub_threshold=hub_threshold)
+
+
+def build_best_pair_chains(text, hub_threshold=3):
+    """Legacy text parser: split on '->' so any section name is accepted."""
+    edges = []
+    for line in str(text).splitlines():
+        m = ARROW_LINE_PAT.match(line)
+        if not m:
+            continue
+        a = _normalize_section_id(m.group(1))
+        b = _normalize_section_id(m.group(2))
+        # drop trailing junk like "no second best pair"
+        if ' ' in b and 'score' not in line.lower():
+            b = b.split()[0]
+        edges.append((a, b))
+    return _chains_from_edges(edges, hub_threshold=hub_threshold)
+
+
+def second_best_to_candidates(
+    second_best_pairs: Dict[str, Tuple[str, float]],
+) -> Dict[str, List[Tuple[str, float]]]:
+    """Convert second-best dict into stitch_chains candidate map."""
+    return {sec: [pair] for sec, pair in second_best_pairs.items()}
 
 # ------------------------- Stitch Core -------------------------
 
@@ -181,25 +223,34 @@ def stitch_chains(primary_chains: List[List[str]],
 
 # ------------------------- Parsing Tools -------------------------
 
-SEC_PAT   = re.compile(NAME_PAT)  
-SCORE_PAT = re.compile(r'\bscore\s*:\s*([0-9.]+)', re.I)
-
-# === 解析工具：parse_primary / parse_secondary 用统一的 SEC_PAT ===
+# === parse_primary / parse_secondary: name-agnostic (split on '->') ===
 def parse_primary(raw: str):
+    """Parse chain lines of the form 'chain1: A -> B -> C' (any section IDs)."""
     chains = []
     for line in raw.strip().splitlines():
-        ids = SEC_PAT.findall(line)
+        if '->' not in line:
+            continue
+        rest = line.split(':', 1)[1] if ':' in line else line
+        rest = SCORE_PAT.sub('', rest)
+        ids = [_normalize_section_id(p) for p in rest.split('->')]
+        ids = [p for p in ids if p]
         if ids:
             chains.append(ids)
     return chains
 
 def parse_secondary(raw: str):
+    """Parse 'A -> B (score: x)' lines; accepts any section ID strings."""
     sec_dict = defaultdict(list)
     for line in raw.strip().splitlines():
-        ids = SEC_PAT.findall(line)
-        if len(ids) >= 2:
-            score = float(SCORE_PAT.search(line).group(1)) if SCORE_PAT.search(line) else 0.0
-            sec_dict[ids[0]].append((ids[1], score))
+        m = ARROW_LINE_PAT.match(line)
+        if not m:
+            continue
+        a = _normalize_section_id(m.group(1))
+        b = _normalize_section_id(m.group(2))
+        if not a or not b or b.lower().startswith('no '):
+            continue
+        score = float(SCORE_PAT.search(line).group(1)) if SCORE_PAT.search(line) else 0.0
+        sec_dict[a].append((b, score))
     for k, lst in sec_dict.items():
         lst.sort(key=lambda x: -x[1])
     return sec_dict
@@ -217,7 +268,11 @@ def load_pair_scores(csv_path: str) -> Dict[frozenset, float]:
     df = pd.read_csv(csv_path)
     score_dict: Dict[frozenset, float] = {}
     for _, row in df.iterrows():
-        key = frozenset((row["fixed"], row["moving"]))
+        fixed = _normalize_section_id(row["fixed"])
+        moving = _normalize_section_id(row["moving"])
+        if not fixed or not moving:
+            continue
+        key = frozenset((fixed, moving))
         sc  = float(row["score"])
         if key not in score_dict or sc > score_dict[key]:
             score_dict[key] = sc
@@ -325,6 +380,10 @@ def link_super_chains(super_chains: List[List[str]],
         chains[idA] = A + B
         chains.pop(idB)      # delete merged chain
 
+    if not chains:
+        if verbose:
+            print("⚠️  No chains to link (empty input).")
+        return []
     return chains if len(chains) > 1 else chains[0]
 
 def main():
@@ -354,7 +413,8 @@ def main():
         print(line)
         best_pair_lines.append(line)
     print('\nstep2: chain grouping (undirected graph method, each section appears only once)')
-    chains = build_best_pair_chains('\n'.join(best_pair_lines))
+    # Use CSV IDs directly — no regex name whitelist
+    chains = build_best_pair_chains_from_pairs(best_pairs)
     for i, chain in enumerate(chains, 1):
         print(f'chain{i}: ' + ' -> '.join(chain))
     # step3: print each section's second best pair
@@ -370,13 +430,10 @@ def main():
             line = f'{section} -> no second best pair'
             print(line)
             second_best_lines.append(line)
-    # step4: stitch chains
+    # step4: stitch chains (dict path; avoids brittle text re-parsing)
     print('\nstep4: merge chains using stitch algorithm')
-    primary_chains_raw = '\n'.join([f'chain{i}: ' + ' -> '.join(chain) for i, chain in enumerate(chains, 1)])
-    secondary_pairs_raw = '\n'.join(second_best_lines)
-    primary_chains = parse_primary(primary_chains_raw)
-    sec_candidates = parse_secondary(secondary_pairs_raw)
-    super_chains = stitch_chains(primary_chains, sec_candidates, verbose=True)
+    sec_candidates = second_best_to_candidates(second_best_pairs)
+    super_chains = stitch_chains(chains, sec_candidates, verbose=True)
     print("\n=== Final Chains ===")
     for i, ch in enumerate(super_chains, 1):
         print(f"chain{i:02d} ({len(ch)}): " + " -> ".join(ch))

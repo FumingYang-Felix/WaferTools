@@ -9,14 +9,16 @@ def parse_chain_file(chain_file_path):
     lines = content.split('\n')
     for line in lines:
         if 'final single chain' in line and ':' in line:
-            chain_part = line.split(':')[1].strip()
-            sections = [s.strip() for s in chain_part.split('->')]
+            chain_part = line.split(':', 1)[1].strip()
+            sections = [s.strip() for s in chain_part.split('->') if s.strip()]
             return sections
     for line in lines:
-        if 'chain' in line and '->' in line and 'section_' in line:
-            chain_part = line.split(':')[1].strip() if ':' in line else line
-            sections = [s.strip() for s in chain_part.split('->')]
-            return sections
+        # Accept any section IDs joined by '->' (not only names containing 'section_')
+        if '->' in line and ('final chain' in line.lower() or line.lower().lstrip().startswith('chain')):
+            chain_part = line.split(':', 1)[1].strip() if ':' in line else line
+            sections = [s.strip() for s in chain_part.split('->') if s.strip()]
+            if sections:
+                return sections
     return None
 
 def texture_rich_color_invariant_preprocessing(img):
