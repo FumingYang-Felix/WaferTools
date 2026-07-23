@@ -57,6 +57,59 @@ def _find_script(*relparts_groups):
     return os.path.join(_repo_root(), *relparts_groups[0])
 
 
+# Downstream clean/chain steps run on the full pairwise CSV, which for a
+# ~1500-image run has ~1.1M rows and can take several minutes. The old 300 s cap
+# raised TimeoutExpired mid-callback (looked like the UI silently died).
+_DOWNSTREAM_TIMEOUT = 3600  # seconds
+
+
+def _terminate_process_tree(proc):
+    """Kill the child AND its worker processes.
+
+    ``proc.terminate()`` only signals the launched Python PID; the SIFT script's
+    pool workers would survive as orphans (still holding the stdout pipe open,
+    which keeps the reader thread blocked). We launch the child in its own
+    process group / session (see ``run_sift_and_log``) and signal the whole group.
+    """
+    import signal
+    if os.name == 'posix':
+        try:
+            pgid = os.getpgid(proc.pid)
+        except Exception:
+            pgid = None
+        if pgid is not None:
+            try:
+                os.killpg(pgid, signal.SIGTERM)
+            except Exception:
+                pass
+            try:
+                proc.wait(timeout=5)
+                return
+            except Exception:
+                pass
+            try:
+                os.killpg(pgid, signal.SIGKILL)
+            except Exception:
+                pass
+            return
+    else:
+        try:
+            subprocess.run(['taskkill', '/F', '/T', '/PID', str(proc.pid)],
+                           capture_output=True)
+            return
+        except Exception:
+            pass
+    # generic fallback
+    try:
+        proc.terminate()
+        proc.wait(timeout=5)
+    except Exception:
+        try:
+            proc.kill()
+        except Exception:
+            pass
+
+
 def _run_clean_csv(raw_csv, proj):
     """Clean a raw pairwise CSV -> cleaned CSV under results/sequencing/cleaned_csv."""
     clean_script = _find_script(
@@ -69,7 +122,7 @@ def _run_clean_csv(raw_csv, proj):
     base = os.path.basename(raw_csv).rsplit('.', 1)[0]
     output_csv = os.path.join(cleaned_dir, _pfx(f"{base}_cleaned.csv", proj))
     cmd = [sys.executable, clean_script, raw_csv, '-o', output_csv]
-    result = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
+    result = subprocess.run(cmd, capture_output=True, text=True, timeout=_DOWNSTREAM_TIMEOUT)
     return result, output_csv
 
 
@@ -87,7 +140,7 @@ def _run_build_chains(clean_csv, proj):
         ('archive_unused_20250829', 'best_pair_chain_graph.py'),
     )
     cmd = [sys.executable, chains_script, '--csv', clean_csv, '--output', output_file]
-    result = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
+    result = subprocess.run(cmd, capture_output=True, text=True, timeout=_DOWNSTREAM_TIMEOUT)
     return result, output_file, ts_dir
 
 
@@ -232,22 +285,50 @@ def run_sift_and_log(cmd, log_path):
     global sift_running, sift_proc
     print(f"[DEBUG] SIFT thread started, log_path={log_path}")
     sift_running = True
+    rc = None
+    # Launch the child in its own process group / session so Stop can signal the
+    # whole tree (the SIFT script plus its worker processes), not just the parent
+    # PID. On POSIX that means start_new_session; on Windows a new process group.
+    popen_kwargs = dict(stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                        text=True, bufsize=1)
+    if os.name == 'posix':
+        popen_kwargs['start_new_session'] = True
+    else:
+        popen_kwargs['creationflags'] = getattr(subprocess, 'CREATE_NEW_PROCESS_GROUP', 0)
     try:
         with open(log_path, 'w') as f:
-            proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1)
+            proc = subprocess.Popen(cmd, **popen_kwargs)
             sift_proc = proc
             for line in proc.stdout:
                 f.write(line)
                 f.flush()
                 with sift_log_lock:
                     sift_log_lines.append(line)
-                print(f"[DEBUG] SIFT log: {line.strip()}")
+                    # Keep only the tail: at ~1.12M pairs the child emits millions
+                    # of lines and this list was never read or truncated -> the GUI
+                    # process would grow to GBs and get OOM-killed on Linux.
+                    if len(sift_log_lines) > 2000:
+                        del sift_log_lines[:-2000]
             proc.wait()
+            rc = proc.returncode
+            # Always write a terminal marker to the LOG FILE. Previously the only
+            # success signal ('CSV written') came from the child and the
+            # '[DEBUG] thread ended' line went to the app's own stdout, never the
+            # file -- so any failure (crash, OOM-kill, no matches) left the UI
+            # polling forever. This marker is written no matter how the child ends.
+            f.write(f"\n[WAFERTOOLS] SIFT process exited with code {rc}\n")
+            f.flush()
     except Exception as e:
         print(f"[ERROR] SIFT thread exception: {e}")
+        try:
+            with open(log_path, 'a') as f:
+                f.write(f"\n[WAFERTOOLS] SIFT thread crashed: {e}\n")
+                f.flush()
+        except Exception:
+            pass
     sift_running = False
     sift_proc = None
-    print(f"[DEBUG] SIFT thread ended")
+    print(f"[DEBUG] SIFT thread ended (exit code {rc})")
 
 # ========== callback registration ==========
 def register_sequencing_callbacks(app):
@@ -373,8 +454,13 @@ def register_sequencing_callbacks(app):
             with open(log_path, 'r', errors='ignore') as f:
                 log = f.read()[-10000:]
 
-        # determine if finished based on keywords (modify according to actual output in script)
-        finished = ('thread ended' in log) or ('CSV written' in log)
+        # Determine if finished. The '[WAFERTOOLS] SIFT process exited' marker is
+        # written by run_sift_and_log for EVERY termination (success or failure),
+        # so the poll always stops instead of hanging when the child dies without
+        # producing 'CSV written'. The latter two are kept for early detection.
+        finished = ('[WAFERTOOLS] SIFT process exited' in log) \
+            or ('[WAFERTOOLS] SIFT thread crashed' in log) \
+            or ('CSV written' in log)
         return log, finished            # <<< second return value controls disabled
 
     # 4b. Auto-run the rest of the pipeline once SIFT finishes (blind to the user):
@@ -400,14 +486,24 @@ def register_sequencing_callbacks(app):
             raise dash.exceptions.PreventUpdate
 
         proj = _seq_project(folder)
-        # 1) clean the raw pairwise CSV
-        cres, cleaned_csv = _run_clean_csv(raw_csv, proj)
-        if cres.returncode != 0:
-            return html.Pre("Auto pipeline – CSV cleaning failed:\n" + (cres.stderr or '')), out_dir
-        # 2) build the section chain
-        bres, output_file, ts_dir = _run_build_chains(cleaned_csv, proj)
-        if bres.returncode != 0:
-            return html.Pre("Auto pipeline – chain building failed:\n" + (bres.stderr or '')), out_dir
+        try:
+            # 1) clean the raw pairwise CSV
+            cres, cleaned_csv = _run_clean_csv(raw_csv, proj)
+            if cres.returncode != 0:
+                return html.Pre("Auto pipeline – CSV cleaning failed:\n" + (cres.stderr or '')), out_dir
+            # 2) build the section chain
+            bres, output_file, ts_dir = _run_build_chains(cleaned_csv, proj)
+            if bres.returncode != 0:
+                return html.Pre("Auto pipeline – chain building failed:\n" + (bres.stderr or '')), out_dir
+        except subprocess.TimeoutExpired as e:
+            # Report instead of letting the exception kill the callback silently.
+            return html.Pre(
+                f"Auto pipeline timed out after {int(e.timeout)}s on a large dataset.\n"
+                f"The raw pairwise CSV is saved at:\n  {raw_csv}\n"
+                f"Run Clean / Build Chains manually on it, or raise "
+                f"_DOWNSTREAM_TIMEOUT."), out_dir
+        except Exception as e:
+            return html.Pre(f"Auto pipeline error: {e}"), out_dir
 
         info = '\n'.join(bres.stdout.strip().splitlines()[:2])
         try:
@@ -508,15 +604,13 @@ def register_sequencing_callbacks(app):
     def stop_sift(n):
         if not n:
             raise dash.exceptions.PreventUpdate
-        # terminate the tracked subprocess (cross-platform; the old pkill was Unix-only)
+        # Terminate the whole process tree (script + pool workers), not just the
+        # launched PID -- otherwise forked/spawned workers survive as orphans.
         global sift_proc
+        proc = sift_proc
         try:
-            if sift_proc is not None and sift_proc.poll() is None:
-                sift_proc.terminate()
-                try:
-                    sift_proc.wait(timeout=5)
-                except Exception:
-                    sift_proc.kill()
+            if proc is not None and proc.poll() is None:
+                _terminate_process_tree(proc)
         except Exception as e:
             print(f"[ERROR] Failed to stop SIFT: {e}")
         return True          # <<< True = stop polling immediately

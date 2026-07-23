@@ -12,23 +12,44 @@ Usage:
 Author: Generated from SIFT analysis pipeline
 """
 
+import os
+# Cap native thread pools BEFORE numpy / OpenCV / BLAS are imported so each
+# worker process stays single-threaded. With many worker processes, letting each
+# spin up an nproc-sized OpenMP / OpenBLAS / TBB pool causes catastrophic thread
+# oversubscription (workers x cores threads) that presents as an apparent hang on
+# many-core Linux boxes.
+for _v in ("OMP_NUM_THREADS", "OPENBLAS_NUM_THREADS", "MKL_NUM_THREADS",
+           "VECLIB_MAXIMUM_THREADS", "NUMEXPR_NUM_THREADS"):
+    os.environ.setdefault(_v, "1")
+
 import cv2
 import numpy as np
 # import matplotlib.pyplot as plt
 import argparse
-import os
 import time
+import csv
+import multiprocessing as mp
 from pathlib import Path
-from concurrent.futures import ProcessPoolExecutor, as_completed
+from concurrent.futures import ProcessPoolExecutor, as_completed, wait, FIRST_COMPLETED
+from concurrent.futures.process import BrokenProcessPool
 import pandas as pd
 from tqdm import tqdm
 from skimage.metrics import structural_similarity as ssim
 # --- SIFT cache related ---
 import pickle, hashlib
-from pathlib import Path
-from functools import partial 
+from functools import partial
+
+# Keep OpenCV's own internal parallelism off in each process; combined with the
+# env caps above this prevents thread oversubscription across many pool workers.
+cv2.setNumThreads(1)
+
 CACHE_DIR = Path("sift_cache")          # you can change to other fixed path
 CACHE_DIR.mkdir(exist_ok=True)
+
+# Memoise file-content md5 by (path, mtime, size) so each image file is hashed at
+# most once per worker process instead of once per pair. At ~1.12M pairs the old
+# per-pair full-file re-hash was O(N^2) full-file reads and dominated runtime.
+_MD5_MEMO = {}
 
 
 def _prep_job(path, args_dict):
@@ -92,8 +113,20 @@ def _cache_key(img_path: str, resize: float,
     based on image file content + all SIFT parameters + resize factor
     """
     # ① file content md5 (prevent same name file from being modified)
-    with open(img_path, "rb") as f:
-        md5 = hashlib.md5(f.read()).hexdigest()
+    # Memoised by (path, mtime, size): the md5 value is identical to before, so
+    # existing sift_cache/*.pkl files stay valid, but an unchanged file is read
+    # and hashed at most once per process instead of once per pair.
+    try:
+        st = os.stat(img_path)
+        memo_key = (img_path, st.st_mtime_ns, st.st_size)
+    except OSError:
+        memo_key = None
+    md5 = _MD5_MEMO.get(memo_key) if memo_key is not None else None
+    if md5 is None:
+        with open(img_path, "rb") as f:
+            md5 = hashlib.md5(f.read()).hexdigest()
+        if memo_key is not None:
+            _MD5_MEMO[memo_key] = md5
 
     # ② put parameters into key, ensure re-calculation when parameters are changed
     key = f"{md5}_{resize}_{sift_features}_{sift_contrast}_{sift_edge}"
@@ -601,6 +634,20 @@ def main():
 # --------------- multi-pair helpers -------------------------- #
 
 def _pair_job(job):
+    # Never let an exception escape a worker: a raised exception would propagate
+    # through fut.result() and, together with the executor's shutdown(wait=True),
+    # could stall or break the whole pool. Failures become a skipped pair (None).
+    try:
+        return _pair_job_impl(job)
+    except Exception as e:
+        try:
+            print(f"pair failed {Path(job[0]).name} vs {Path(job[1]).name}: {e}")
+        except Exception:
+            pass
+        return None
+
+
+def _pair_job_impl(job):
     path_a, path_b, args_dict = job
     args = argparse.Namespace(**args_dict)
 
@@ -688,8 +735,14 @@ def run_all_pairs(args):
     )
     prep_worker = partial(_prep_job, args_dict=prep_arg)
 
-    with ProcessPoolExecutor(max_workers=args.cpu_workers or 4) as pool:
-        for msg in tqdm(pool.map(prep_worker, img_paths),
+    # Use the 'spawn' start method explicitly. On Linux the default is 'fork',
+    # which copies the parent's lock/thread state (OpenCV, BLAS) into every worker
+    # and makes workers inherit the parent's open file descriptors — both are
+    # classic sources of deadlock. macOS and Windows already default to 'spawn',
+    # which is why the pipeline hangs only on Linux.
+    ctx = mp.get_context("spawn")
+    with ProcessPoolExecutor(max_workers=args.cpu_workers or 4, mp_context=ctx) as pool:
+        for msg in tqdm(pool.map(prep_worker, img_paths, chunksize=8),
                         total=len(img_paths), desc="cache"):
             print(msg)
 
@@ -718,37 +771,80 @@ def run_all_pairs(args):
         'ssim_scale_max'  : args.ssim_scale_max,
     }
 
-    jobs = [(str(img_paths[i]), str(img_paths[j]), arg_dict)
-            for i in range(len(img_paths) - 1)
-            for j in range(i + 1, len(img_paths))]
+    n = len(img_paths)
+    total_pairs = n * (n - 1) // 2
+    paths = [str(p) for p in img_paths]
 
-    print(f"Processing {len(jobs)} pairs from {len(img_paths)} images …")
+    # Generate pairs lazily instead of materialising all ~N^2/2 job tuples at
+    # once (1500 images -> ~1.12M tuples ~ 2+ GB in the parent alone).
+    def _iter_jobs():
+        for i in range(n - 1):
+            for j in range(i + 1, n):
+                yield (paths[i], paths[j], arg_dict)
 
-    records = []
-    if args.cpu_workers > 1:
-        with ProcessPoolExecutor(max_workers=args.cpu_workers) as pool:
-            futures = [pool.submit(_pair_job, jb) for jb in jobs]
-            for fut in tqdm(as_completed(futures), total=len(jobs), desc="pairs"):
-                rec = fut.result()
-                if rec is not None:
-                    records.append(rec)
-    else:
-        for jb in tqdm(jobs, desc="pairs"):
-            rec = _pair_job(jb)
-            if rec is not None:
-                records.append(rec)
+    print(f"Processing {total_pairs} pairs from {n} images …")
 
-    if not records:
-        print("No successful alignments.")
-        return
-
-    df = pd.DataFrame(records, columns=[
-        'fixed', 'moving', 'dx_px', 'dy_px', 'angle_deg', 'scale',
-        'inlier_ratio', 'num_inliers', 'ssim', 'overlap_px'
-    ])
-
+    columns = ['fixed', 'moving', 'dx_px', 'dy_px', 'angle_deg', 'scale',
+               'inlier_ratio', 'num_inliers', 'ssim', 'overlap_px']
     csv_path = out_dir / "pairwise_alignment_results.csv"
-    df.to_csv(csv_path, index=False)
+    n_written = 0
+
+    # Stream results straight to disk so (a) memory stays flat regardless of how
+    # many pairs there are and (b) a crash still leaves a usable partial CSV.
+    with open(csv_path, "w", newline="") as fcsv:
+        writer = csv.writer(fcsv)
+        writer.writerow(columns)
+        fcsv.flush()
+
+        if args.cpu_workers and args.cpu_workers > 1:
+            ctx = mp.get_context("spawn")
+            # Bounded sliding window: never keep more than `max_pending` futures
+            # alive. This is what stops the old
+            #   futures = [pool.submit(...) for jb in jobs]   # ~1.12M futures
+            # pattern from exhausting RAM and triggering the Linux OOM killer.
+            max_pending = max(4, args.cpu_workers * 4)
+            job_iter = _iter_jobs()
+            try:
+                with ProcessPoolExecutor(max_workers=args.cpu_workers, mp_context=ctx) as pool:
+                    pending = set()
+                    for _ in range(max_pending):
+                        jb = next(job_iter, None)
+                        if jb is None:
+                            break
+                        pending.add(pool.submit(_pair_job, jb))
+                    with tqdm(total=total_pairs, desc="pairs") as pbar:
+                        while pending:
+                            done, pending = wait(pending, return_when=FIRST_COMPLETED)
+                            for fut in done:
+                                rec = fut.result()
+                                if rec is not None:
+                                    writer.writerow(rec)
+                                    n_written += 1
+                                pbar.update(1)
+                                jb = next(job_iter, None)
+                                if jb is not None:
+                                    pending.add(pool.submit(_pair_job, jb))
+                            fcsv.flush()
+            except BrokenProcessPool as e:
+                # A worker died hard (segfault / OOM-kill). Keep the partial CSV
+                # and exit non-zero so the UI still sees a terminal marker rather
+                # than polling forever.
+                fcsv.flush()
+                print(f"Worker pool broke (likely out of memory) after "
+                      f"{n_written} rows: {e}")
+                print(f"CSV written to {csv_path}")
+                raise SystemExit(1)
+        else:
+            with tqdm(total=total_pairs, desc="pairs") as pbar:
+                for jb in _iter_jobs():
+                    rec = _pair_job(jb)
+                    if rec is not None:
+                        writer.writerow(rec)
+                        n_written += 1
+                    pbar.update(1)
+                fcsv.flush()
+
+    print(f"Wrote {n_written} rows of {total_pairs} pairs.")
     print(f"CSV written to {csv_path}")
     #print(f"Overlays saved to {overlay_dir}")
 
