@@ -306,8 +306,10 @@ def run_sift_and_log(cmd, log_path):
                     sift_log_lines.append(line)
                     # Keep only the tail: at ~1.12M pairs the child emits millions
                     # of lines and this list was never read or truncated -> the GUI
-                    # process would grow to GBs and get OOM-killed on Linux.
-                    if len(sift_log_lines) > 2000:
+                    # process would grow to GBs and get OOM-killed on Linux. Trim in
+                    # batches (only once the buffer grows past 4000) so the O(n)
+                    # list shift happens ~once per 2000 lines, not on every line.
+                    if len(sift_log_lines) > 4000:
                         del sift_log_lines[:-2000]
             proc.wait()
             rc = proc.returncode

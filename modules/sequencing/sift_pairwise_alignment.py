@@ -30,9 +30,8 @@ import time
 import csv
 import multiprocessing as mp
 from pathlib import Path
-from concurrent.futures import ProcessPoolExecutor, as_completed, wait, FIRST_COMPLETED
+from concurrent.futures import ProcessPoolExecutor, wait, FIRST_COMPLETED
 from concurrent.futures.process import BrokenProcessPool
-import pandas as pd
 from tqdm import tqdm
 from skimage.metrics import structural_similarity as ssim
 # --- SIFT cache related ---
@@ -787,11 +786,18 @@ def run_all_pairs(args):
     columns = ['fixed', 'moving', 'dx_px', 'dy_px', 'angle_deg', 'scale',
                'inlier_ratio', 'num_inliers', 'ssim', 'overlap_px']
     csv_path = out_dir / "pairwise_alignment_results.csv"
+    # Write incrementally to a .partial file and only promote it to the final
+    # name once the run FINISHES. This keeps the invariant the UI relies on --
+    # pairwise_alignment_results.csv exists only on a completed run -- so a
+    # Stop/crash mid-run leaves the partial data on disk (for manual recovery)
+    # without tricking autorun_after_sift into running the downstream pipeline
+    # on incomplete pairwise results.
+    tmp_path = out_dir / "pairwise_alignment_results.csv.partial"
     n_written = 0
 
     # Stream results straight to disk so (a) memory stays flat regardless of how
     # many pairs there are and (b) a crash still leaves a usable partial CSV.
-    with open(csv_path, "w", newline="") as fcsv:
+    with open(tmp_path, "w", newline="") as fcsv:
         writer = csv.writer(fcsv)
         writer.writerow(columns)
         fcsv.flush()
@@ -826,13 +832,14 @@ def run_all_pairs(args):
                                     pending.add(pool.submit(_pair_job, jb))
                             fcsv.flush()
             except BrokenProcessPool as e:
-                # A worker died hard (segfault / OOM-kill). Keep the partial CSV
-                # and exit non-zero so the UI still sees a terminal marker rather
-                # than polling forever.
+                # A worker died hard (segfault / OOM-kill). Keep the partial data
+                # (do NOT promote it to the final name, so autorun won't treat a
+                # broken run as complete) and exit non-zero so the UI still sees a
+                # terminal marker rather than polling forever.
                 fcsv.flush()
                 print(f"Worker pool broke (likely out of memory) after "
                       f"{n_written} rows: {e}")
-                print(f"CSV written to {csv_path}")
+                print(f"Partial results kept at {tmp_path}")
                 raise SystemExit(1)
         else:
             with tqdm(total=total_pairs, desc="pairs") as pbar:
@@ -844,6 +851,10 @@ def run_all_pairs(args):
                     pbar.update(1)
                 fcsv.flush()
 
+    # Run finished normally: atomically promote the partial file to the final
+    # name the UI looks for. (Reached only if no SystemExit/exception unwound
+    # out of the `with` above, i.e. the pairs phase ran to completion.)
+    os.replace(tmp_path, csv_path)
     print(f"Wrote {n_written} rows of {total_pairs} pairs.")
     print(f"CSV written to {csv_path}")
     #print(f"Overlays saved to {overlay_dir}")
