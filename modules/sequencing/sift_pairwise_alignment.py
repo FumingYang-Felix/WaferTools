@@ -19,7 +19,8 @@ import os
 # oversubscription (workers x cores threads) that presents as an apparent hang on
 # many-core Linux boxes.
 for _v in ("OMP_NUM_THREADS", "OPENBLAS_NUM_THREADS", "MKL_NUM_THREADS",
-           "VECLIB_MAXIMUM_THREADS", "NUMEXPR_NUM_THREADS"):
+           "VECLIB_MAXIMUM_THREADS", "NUMEXPR_NUM_THREADS",
+           "OPENCV_FOR_THREADS_NUM"):
     os.environ.setdefault(_v, "1")
 
 import cv2
@@ -810,37 +811,56 @@ def run_all_pairs(args):
             # pattern from exhausting RAM and triggering the Linux OOM killer.
             max_pending = max(4, args.cpu_workers * 4)
             job_iter = _iter_jobs()
-            try:
-                with ProcessPoolExecutor(max_workers=args.cpu_workers, mp_context=ctx) as pool:
-                    pending = set()
-                    for _ in range(max_pending):
-                        jb = next(job_iter, None)
-                        if jb is None:
-                            break
-                        pending.add(pool.submit(_pair_job, jb))
-                    with tqdm(total=total_pairs, desc="pairs") as pbar:
-                        while pending:
-                            done, pending = wait(pending, return_when=FIRST_COMPLETED)
-                            for fut in done:
-                                rec = fut.result()
-                                if rec is not None:
-                                    writer.writerow(rec)
-                                    n_written += 1
-                                pbar.update(1)
+            # A single worker dying natively (an OpenCV segfault on a bad pair, or
+            # an OOM-kill) turns the whole pool into a BrokenProcessPool. Instead
+            # of aborting the entire ~1.12M-pair run, rebuild the pool and carry on
+            # from where `job_iter` left off; the few pairs that were in flight at
+            # the moment of the crash are skipped (the same missing-edge the graph
+            # already tolerates). Only give up after MAX_RESTARTS to avoid looping
+            # forever on a systematically broken environment.
+            restarts = 0
+            MAX_RESTARTS = 50
+            pending = set()
+            with tqdm(total=total_pairs, desc="pairs") as pbar:
+                while True:
+                    try:
+                        with ProcessPoolExecutor(max_workers=args.cpu_workers, mp_context=ctx) as pool:
+                            pending = set()
+                            for _ in range(max_pending):
                                 jb = next(job_iter, None)
-                                if jb is not None:
-                                    pending.add(pool.submit(_pair_job, jb))
-                            fcsv.flush()
-            except BrokenProcessPool as e:
-                # A worker died hard (segfault / OOM-kill). Keep the partial data
-                # (do NOT promote it to the final name, so autorun won't treat a
-                # broken run as complete) and exit non-zero so the UI still sees a
-                # terminal marker rather than polling forever.
-                fcsv.flush()
-                print(f"Worker pool broke (likely out of memory) after "
-                      f"{n_written} rows: {e}")
-                print(f"Partial results kept at {tmp_path}")
-                raise SystemExit(1)
+                                if jb is None:
+                                    break
+                                pending.add(pool.submit(_pair_job, jb))
+                            while pending:
+                                done, pending = wait(pending, return_when=FIRST_COMPLETED)
+                                for fut in done:
+                                    rec = fut.result()   # BrokenProcessPool -> except
+                                    if rec is not None:
+                                        writer.writerow(rec)
+                                        n_written += 1
+                                    pbar.update(1)
+                                    jb = next(job_iter, None)
+                                    if jb is not None:
+                                        pending.add(pool.submit(_pair_job, jb))
+                                fcsv.flush()
+                        break   # all jobs consumed, pool closed cleanly
+                    except BrokenProcessPool as e:
+                        restarts += 1
+                        fcsv.flush()
+                        lost = len(pending)
+                        pbar.update(lost)         # count the skipped in-flight pairs
+                        pending = set()
+                        print(f"Worker pool broke ({e}); restart "
+                              f"{restarts}/{MAX_RESTARTS}, kept {n_written} rows, "
+                              f"skipped ~{lost} in-flight pairs")
+                        if restarts > MAX_RESTARTS:
+                            # Environment is systematically broken. Leave the
+                            # partial data (do NOT promote to the final name) and
+                            # exit non-zero so the UI sees a terminal marker.
+                            print(f"Too many pool restarts; partial results kept "
+                                  f"at {tmp_path}")
+                            raise SystemExit(1)
+                        # else: rebuild the pool and continue with remaining jobs
         else:
             with tqdm(total=total_pairs, desc="pairs") as pbar:
                 for jb in _iter_jobs():
