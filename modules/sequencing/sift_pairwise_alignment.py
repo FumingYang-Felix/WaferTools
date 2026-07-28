@@ -633,6 +633,15 @@ def main():
 
 # --------------- multi-pair helpers -------------------------- #
 
+def _mute_worker_stdout():
+    """Pool-worker initializer: silence the ~10 per-pair diagnostic prints so a
+    multi-day run doesn't accumulate a multi-GB log (which used to grow the file
+    the dashboard tails and bloat the disk). tqdm progress and the 'CSV written'
+    sentinel are printed by the PARENT process, so they are unaffected."""
+    import sys
+    sys.stdout = open(os.devnull, 'w')
+
+
 def _pair_job(job):
     # Never let an exception escape a worker: a raised exception would propagate
     # through fut.result() and, together with the executor's shutdown(wait=True),
@@ -821,10 +830,11 @@ def run_all_pairs(args):
             restarts = 0
             MAX_RESTARTS = 50
             pending = set()
-            with tqdm(total=total_pairs, desc="pairs") as pbar:
+            with tqdm(total=total_pairs, desc="pairs", mininterval=2.0) as pbar:
                 while True:
                     try:
-                        with ProcessPoolExecutor(max_workers=args.cpu_workers, mp_context=ctx) as pool:
+                        with ProcessPoolExecutor(max_workers=args.cpu_workers, mp_context=ctx,
+                                                 initializer=_mute_worker_stdout) as pool:
                             pending = set()
                             for _ in range(max_pending):
                                 jb = next(job_iter, None)
@@ -862,7 +872,7 @@ def run_all_pairs(args):
                             raise SystemExit(1)
                         # else: rebuild the pool and continue with remaining jobs
         else:
-            with tqdm(total=total_pairs, desc="pairs") as pbar:
+            with tqdm(total=total_pairs, desc="pairs", mininterval=2.0) as pbar:
                 for jb in _iter_jobs():
                     rec = _pair_job(jb)
                     if rec is not None:

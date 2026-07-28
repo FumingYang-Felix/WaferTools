@@ -453,8 +453,21 @@ def register_sequencing_callbacks(app):
     def update_sift_log(_, log_path):
         log = ''
         if log_path and os.path.exists(log_path):
-            with open(log_path, 'r', errors='ignore') as f:
-                log = f.read()[-10000:]
+            # Read only the TAIL of the log, never the whole file. The log grows
+            # for the entire run (hundreds of MB / GB over a multi-day run); the
+            # old f.read()[-10000:] re-read and decoded the ENTIRE file on every
+            # 300 ms tick, which froze the dashboard after several hours. Seeking
+            # to the end keeps each poll a constant ~16 KB regardless of size.
+            try:
+                with open(log_path, 'rb') as f:
+                    f.seek(0, os.SEEK_END)
+                    size = f.tell()
+                    if size > 16384:
+                        f.seek(size - 16384)
+                    data = f.read()
+                log = data.decode('utf-8', errors='ignore')[-10000:]
+            except OSError:
+                log = ''
 
         # Determine if finished. The '[WAFERTOOLS] SIFT process exited' marker is
         # written by run_sift_and_log for EVERY termination (success or failure),
